@@ -46,7 +46,6 @@ function drawGraph(qlog, settings){
 			let evtArray = categoryDictionary.get(evtname);
 			
 			let timestamp = (parseInt(evt[fieldIndices.timestamp]) * timeMultiplier); 
-			//console.log( timestamp, evt[fieldIndices.timestamp] );
 			evtArray.push( { timestamp: timestamp, trigger: trigger, details: data } );
 		}
 		
@@ -192,13 +191,10 @@ function drawGraph(qlog, settings){
 			}
 			
 			
-			
-			
 			let scatters = [];
 			let smallMaxX = 0;
 			let smallMaxY = 0;
 			let largeMaxX = 0;
-			let largeMaxY = 0;
 			
 			let lineWidth = 0.75 * scale;
 			
@@ -228,8 +224,6 @@ function drawGraph(qlog, settings){
 				// packets are always a couple of ms separate, use this logic 
 				let widthOfPacket = Math.max(1, (obj.context.canvas.clientWidth / xMax) * 2); // each packet is 5ms wide, except if that would be smaller than 1 px
 				
-				//console.log("Canvas height: ", heightOfPacket, widthOfPacket );
-				
 				obj.context.lineCap     = 'butt'; // creator forgets to reset these when drawing his drawmarks
 				obj.context.lineJoin    = 'butt'; // creator forgets to reset these when drawing his drawmarks
 
@@ -253,22 +247,10 @@ function drawGraph(qlog, settings){
 
 				if( sentPacket.time > maxTimestamp )
 					break;
-					 
-				// want to create separate data for graphs 
-				// use a scatter plot because with line plot we can't draw vertical lines 
-				// lines and whiskers are drawn separately, so we have 3 data entries per segment
-				//let rgraphData = [];
-				//let whiskerData = [];
 				
 				let x  = sentPacket.time;
 				let y1 = sentPacket.from;
 				let y2 = sentPacket.to;
-				
-				//let whiskerWidth = 1.5 * scale;
-				
-				//rgraphData.push( [[x, y1], [x, y2]] ); // main vertical line
-				//whiskerData.push( [[x-whiskerWidth, y1], [x+whiskerWidth, y1]] ); // bottom whisker
-				//whiskerData.push( [[x-whiskerWidth, y2], [x+whiskerWidth, y2]] ); // top whisker
 				
 				smallMaxX = Math.max(smallMaxX, x);
 				smallMaxY = Math.max(smallMaxY, y2);
@@ -277,62 +259,6 @@ function drawGraph(qlog, settings){
 				// so we need an extra LUT to know the packet size to correctly calculate the height of the tickmarks later 
 				packetsSentSizeLUT.push( sentPacket );
 				packetsSentScatterData.push( [x, y1 + ((y2 - y1) / 2)] );
-				//packetsSentScatterData.push( [x, y2] );
-				
-				
-				/*
-				// https://www.rgraph.net/canvas/docs/scatter.html
-				let scatter = new RGraph.Scatter({
-					id: 'recoveryPlot', 
-					data: rgraphData 
-				});
-				
-				if( scatters.length == 0 ){
-					scatter.set("title", "Recovery " + title);
-					scatter.set("titleY", -50);
-					scatter.set("textSize", 12 * scale);
-					//scatter.set("xscaleFormatter", function(obj, num){ return Math.floor(num); });
-					scatter.set("scale.formatter", scaleFormatter);
-					//scatter.set("scaleRound", true);
-					scatter.set("xscale", true); // proper x-labels 
-					scatter.set("ylabelsCount", 5);
-					scatter.set("scaleThousand", "");
-					scatter.set("backgroundGrid", false);
-				}
-				
-				
-				scatter.set("tickmarks", null); 
-				scatter.set("line.colors", ["#0000FF"]); // no option to set a single color... dumb
-				scatter.set("line", true);
-				scatter.set("lineLinewidth", lineWidth);
-				//scatter.set("lineDash", [1, 5] );
-				
-				if( scatters.length != 0 ){
-					scatter.set("scale.formatter", scaleFormatter);
-					scatter.set("backgroundGrid", false);
-					scatter.set("scaleThousand", "");
-					scatter.set("xscale", false); // x-labels would be fucked with per-stream x offsets otherwhise 
-				}
-				
-				scatters.push( scatter ); 
-				
-				let scatterW = new RGraph.Scatter({
-					id: 'recoveryPlot', 
-					data: whiskerData 
-				});
-
-				scatterW.set("backgroundGridWidth", 1 * scale);
-				scatterW.set("tickmarks", null); 
-				scatterW.set("line.colors", ["#0000FF"]); // no option to set a single color... dumb
-				scatterW.set("line", true);
-				scatterW.set("lineLinewidth", lineWidth / 2);
-				scatterW.set("scale.formatter", scaleFormatter);
-				scatterW.set("backgroundGrid", false);
-				scatterW.set("scaleThousand", "");
-				scatterW.set("xscale", false); // x-labels would be fucked with per-stream x offsets otherwhise 
-				
-				//scatters.push( scatterW ); 
-				*/
 			}
 			
 			let packetsSentScatter = new RGraph.Scatter({
@@ -343,29 +269,14 @@ function drawGraph(qlog, settings){
 			packetsSentScatter.set("title", title);
 			packetsSentScatter.set("titleY", -50);
 			packetsSentScatter.set("textSize", 6 * scale); 
-			//scatter.set("xscaleFormatter", function(obj, num){ return Math.floor(num); });
 			packetsSentScatter.set("scale.formatter", scaleFormatter);
-			//scatter.set("scaleRound", true);
 			packetsSentScatter.set("xscale", true); // proper x-labels 
 			packetsSentScatter.set("ylabelsCount", 5);
 			packetsSentScatter.set("line", false);
-			//packetsSentScatter.set("line.visible", false);
 			packetsSentScatter.set("scaleThousand", "");
 			packetsSentScatter.set("backgroundGrid", false);
 			packetsSentScatter.set("defaultcolor", "#0000FF");
-			
-	
-			
-			//packetsSentScatter.set("tickmarks", null);
-			
 			packetsSentScatter.set("tickmarks", (...args) => verticalTick(packetsSentSizeLUT, ...args));
-			//packetsSentScatter.set("tickmarks", "circle"); 
-			//packetsSentScatter.set("ticksize", 3); 
-			
-			//packetsSentScatter.set("tickmarksStyle", "circle"); 
-			//packetsSentScatter.set("line.colors", ["#0000FF"]); // no option to set a single color... dumb
-			//packetsSentScatter.set("line", true);
-			//packetsSentScatter.set("lineLinewidth", lineWidth);
 				
 			scatters.push( packetsSentScatter ); 
 			
@@ -404,7 +315,6 @@ function drawGraph(qlog, settings){
 			packetsAckedScatter.set("backgroundGrid", false);
 			packetsAckedScatter.set("scaleThousand", "");
 			packetsAckedScatter.set("line", false);
-			//packetsAckedScatter.set("line.visible", false);
 			packetsAckedScatter.set("xscale", false); // x-labels would be messed up otherwhise 
 			packetsAckedScatter.set("defaultcolor", "#6B8E23"); // green
 			packetsAckedScatter.set("tickmarks",  (...args) => verticalTick(packetsAckedSizeLUT, ...args));
@@ -447,7 +357,6 @@ function drawGraph(qlog, settings){
 			packetsLostScatter.set("backgroundGrid", false);
 			packetsLostScatter.set("scaleThousand", "");
 			packetsLostScatter.set("line", false);
-			//packetsLostScatter.set("line.visible", false);
 			packetsLostScatter.set("xscale", false); // x-labels would be messed up otherwhise 
 			packetsLostScatter.set("defaultcolor", "#FF0000"); // red
 			packetsLostScatter.set("tickmarks",  (...args) => verticalTick(packetsLostSizeLUT, ...args));
@@ -456,18 +365,13 @@ function drawGraph(qlog, settings){
 			
 			
 			
-	
-			
 			smallMaxX = Math.min( smallMaxX, xCap );
-			//smallMaxY = Math.max( smallMaxY, yCap );
 			
 			smallMaxX = smallMaxX + ( Math.floor(smallMaxX * 0.01)); // add 5% of breathing space to the graph 
 			smallMaxY = smallMaxY + ( Math.floor(smallMaxY * 0.01)); // add 5% of breathing space to the graph
 			
-			smallMaxX = Math.round( smallMaxX / 50 ) * 50;//smallMaxX - (smallMaxX % 50); // round to the nearest number divisble by 50
-			smallMaxY = Math.ceil( smallMaxY / 5000 ) * 5000;//smallMaxX - (smallMaxX % 50); // round to the nearest number divisble by 5000
-			
-			//console.log( "XMAX ", smallMaxX);
+			smallMaxX = Math.round( smallMaxX / 50 ) * 50;// round to the nearest number divisble by 50
+			smallMaxY = Math.ceil( smallMaxY / 5000 ) * 5000;// round to the nearest number divisble by 5000
 			
 			for( let scatter of scatters ){
 				scatter.set("xmin", settings.minX );
@@ -477,165 +381,15 @@ function drawGraph(qlog, settings){
 			}
 			
 			largeMaxX = smallMaxX;
-			largeMaxY = Math.min( 90000, yCap );
-			largeMaxY = Math.ceil( largeMaxY / 10000 ) * 10000;//smallMaxX - (smallMaxX % 50); // round to the nearest number divisble by 5000
-			//smallMaxY = Math.max( smallMaxY, yCap ); // TODO : FIXME: calculate dynamically
+
 			
-			/*
+			
+			
 			// ------------------------------------------------
 			// ------------------------------------------------
 			// ------------------------------------------------
-			//	line graphs for max_data and stream_max_data
-			
-			// connection-level flow control is a separate line 
-			let maxDataPoints = [];
-			let maxDataFrames = multistreamDictionary.get("TRANSPORT").get("MAXDATA_NEW");
-			for( let frame of maxDataFrames ){
-				
-				// only want to see the changes to our own max_data setting when we receive a new packet
-				// logic is abit borked, would probably expect TX here, but that's just the way it is for now 
-				let receiving = frame.trigger.indexOf("RX") >= 0;
-				if(receiving){
-					//maxDataPoints.push( { timestamp: frame.timestamp, max_data: frame.details.max_data } );
-					maxDataPoints.push( [frame.timestamp, frame.details.max_data] ); // graph expects [x,y] pairs 
-				}
-			}
-			
-			// for explanation, see below with the maxStreamData stuff 
-			let graphPoints = [];
-			let lastValue = 0;
-			for( let point of maxDataPoints ){
-				if( graphPoints.length > 0 )
-					graphPoints.push( [point[0], lastValue] );
-				
-				graphPoints.push( point ); 
-				lastValue = point[1];
-			}
-			// the final point should go all the way to the right 
-			graphPoints.push( [ largeMaxX + 1,  graphPoints[ graphPoints.length - 1 ][1] ] );
-			graphPoints[0][0] = 0; // let's it start at the 0-point of the x-axis
-			*/
 			
 			let lines = [];
-			
-			/*
-			let line = new RGraph.Scatter({
-				id: 'recoveryPlot2', 
-				data: graphPoints, //[[0,0], [150, 1500], [200,3000], [660,13000]]
-			});
-			
-			line.set("tickmarks", "circle");
-			line.set("ticksize", 4);	
-			line.set("xscale", true );
-			line.set("backgroundGridWidth", 1 * scale);
-			line.set("xmax", largeMaxX );
-			line.set("ymax", largeMaxY );
-			line.set("line.colors", ["black"]); // no option to set a single color... dumb
-			line.set("line", true);
-			line.set("lineLinewidth", 2 * scale);
-			line.set("backgroundGrid", true);
-			line.set("lineDash", [5 * scale, 5 * scale] );
-			line.set("textSize", 12 * scale);
-			line.set("xscaleNumlabels", 10);
-			line.set("scale.formatter", scaleFormatter);
-			lines.push(line);
-			*/
-			
-			/*
-			// onwards to stream-level flow control 
-			let lineWidth2 = 1.5 * scale;
-			
-			let streamYOffsets = new Map();
-			streamYOffsets.set(0, 0);
-			streamYOffsets.set(4, lineWidth2 * 200/scale);
-			streamYOffsets.set(8, lineWidth2 * 400/scale);
-			streamYOffsets.set(12, lineWidth2 * 600/scale);
-			streamYOffsets.set(16, lineWidth2 * 800/scale);
-			//streamYOffsets.set(0, 0);
-			//streamYOffsets.set(4, 0);
-			//streamYOffsets.set(8, 0);
-			//streamYOffsets.set(12, 0);
-			//streamYOffsets.set(16, 0);
-			//streamYOffsets.set(0, 0);
-			//streamYOffsets.set(4, lineWidth2 * 100/scale);
-			//streamYOffsets.set(8, lineWidth2 * 250/scale);
-			//streamYOffsets.set(12, lineWidth2 * 400/scale);
-			//streamYOffsets.set(16, lineWidth2 * 550/scale);
-			
-			let streamMaxDataXOffsets = new Map();
-			streamMaxDataXOffsets.set(0, 0);
-			streamMaxDataXOffsets.set(4, 0);//4.5 * scale);
-			streamMaxDataXOffsets.set(8, 0);
-			streamMaxDataXOffsets.set(12, 0);//4.5 * scale);
-			streamMaxDataXOffsets.set(16, 0);
-			
-			streamIDs = new Map();
-			let maxStreamDataFrames = multistreamDictionary.get("TRANSPORT").get("MAXSTREAMDATA_NEW");
-			for( let frame of maxStreamDataFrames ){
-					
-				// only want to see the changes to our own max_data setting when we receive a new packet
-				// logic is abit borked, would probably expect TX here, but that's just the way it is for now 
-				let receiving = frame.trigger.indexOf("RX") >= 0;
-				if(receiving){
-					
-					if( !streamIDs.has(frame.details.stream_id) )
-						streamIDs.set( frame.details.stream_id, [ [0 + streamMaxDataXOffsets.get(frame.details.stream_id), 5120 + streamYOffsets.get(frame.details.stream_id)] ] ); // TODO: hardcoded now for quick EPIQ paper viz, qlog should log this value initially when logging transport params 
-						
-					maxStreamDataPoints = streamIDs.get(frame.details.stream_id);
-					
-					maxStreamDataPoints.push( [frame.timestamp - 2*scale, frame.details.max_stream_data + streamYOffsets.get(frame.details.stream_id)] );
-				}
-			}
-			
-			
-			for( let [streamID, maxStreamDataPoints] of streamIDs ){
-			
-				// maxStreamDataPoints are in the form of successive [timestamp, max_value] 
-				// but that would draw slanted lined directly between these points 
-				// we need to convey that the max_data stays the same until we receive an update, afther which it is directly changes 
-				//							  _
-				// i.e. we don't want / but _| 
-				// so we generate the bottom points of the vertical lines and inject them 
-				let graphPoints = [];
-				let lastValue = 0;
-				for( let point of maxStreamDataPoints ){
-					if( graphPoints.length > 0 )
-						graphPoints.push( [point[0], lastValue] );
-					
-					graphPoints.push( point ); 
-					lastValue = point[1];
-				}
-				// the final point should go all the way to the right 
-				graphPoints.push( [ smallMaxX + 1,  graphPoints[ graphPoints.length - 1 ][1] ] );
-				
-				//console.log( graphPoints );
-			
-				let line = new RGraph.Scatter({
-					id: 'recoveryPlot', 
-					data: graphPoints
-				});
-				
-				line.set("tickmarks", null);
-				//line.set("tickmarks", "circle");
-				//line.set("ticksize", lineWidth2 + 2);			
-				line.set("xmax", smallMaxX );
-				line.set("ymax", smallMaxY );
-				line.set("line.colors", [lineColorDefs.get(streamID)]); // no option to set a single color... dumb
-				line.set("line", true);
-				line.set("scale.formatter", scaleFormatter);				
-				line.set("lineLinewidth", lineWidth2);
-				line.set("backgroundGrid", false);
-				line.set("lineDash", [5 * scale, 5 * scale] );
-				lines.push(line);
-			}
-			*/
-			
-			
-			// ------------------------------------------------
-			// ------------------------------------------------
-			// ------------------------------------------------
-			//	line graphs for congestion window, bytes in flight and congestion window available 
-			
 
 			let metricUpdates = multistreamDictionary.get("RECOVERY").get("METRIC_UPDATE");
 			
@@ -710,7 +464,6 @@ function drawGraph(qlog, settings){
 					data: bytesUpdates
 				});
 				
-				//cwndAvailLine.set("tickmarks", null);
 				inFlightLine.set("tickmarks", "circle");
 				inFlightLine.set("ticksize", 4);	
 				inFlightLine.set("defaultcolor", ['#808000']);
@@ -725,7 +478,6 @@ function drawGraph(qlog, settings){
 				inFlightLine.set("scaleThousand", "");
 				inFlightLine.set("xscale", false); // x-labels would be messed up otherwhise 
 				inFlightLine.set("scale.formatter", scaleFormatter);
-				//cwndAvailLine.set("lineDash", [5, 5] );
 				lines.push(inFlightLine);
 			}
 
@@ -737,9 +489,7 @@ function drawGraph(qlog, settings){
 					data: cwndupdates
 				});
 				
-				//cwndAvailLine.set("tickmarks", null);
 				cwndLine.set("tickmarks", "cross");
-				//cwndAvailLine.set("ticksize", lineWidthCwndAvail + 3 * scale);	
 				cwndLine.set("defaultcolor", ['#8A2BE2']);
 				cwndLine.set("xmin", settings.minX );
 				cwndLine.set("ymin", (packetsSentSizeLUT[0].from < 5000) ? 0 : packetsSentSizeLUT[0].from );
@@ -752,7 +502,6 @@ function drawGraph(qlog, settings){
 				cwndLine.set("scaleThousand", "");
 				cwndLine.set("xscale", false); // x-labels would be messed up otherwhise 
 				cwndLine.set("scale.formatter", scaleFormatter);
-				//cwndAvailLine.set("lineDash", [5, 5] );
 				lines.push(cwndLine);
 			}
 
@@ -778,7 +527,6 @@ function drawGraph(qlog, settings){
 				minRTTline.set("backgroundGrid", true);
 				minRTTline.set("scaleThousand", "");
 				minRTTline.set("xscale", false);// x-labels would be messed up otherwhise 
-				//minRTTline.set("scale.formatter", scaleFormatter);
 				lines.push(minRTTline);
 			}
 
@@ -824,82 +572,11 @@ function drawGraph(qlog, settings){
 				latestRTTline.set("backgroundGrid", true);
 				latestRTTline.set("scaleThousand", "");
 				latestRTTline.set("xscale", false);// x-labels would be messed up otherwhise 
-				//latestRTTline.set("scale.formatter", scaleFormatter);
 				lines.push(latestRTTline);
 			}
 
-			/*
-			let lineWidthCwndAvail = 2 * scale;
-			
-			let cwndAvailLine = new RGraph.Scatter({
-				id: 'recoveryPlot2', 
-				data: cwndAvailFixed
-			});
-			
-			//cwndAvailLine.set("tickmarks", null);
-			cwndAvailLine.set("tickmarks", "cross");
-			cwndAvailLine.set("ticksize", lineWidthCwndAvail + 3 * scale);	
-			cwndAvailLine.set("defaultcolor", ['#808000']);	
-			cwndAvailLine.set("xmax", largeMaxX );
-			cwndAvailLine.set("ymax", largeMaxY );
-			cwndAvailLine.set("line.colors", ['#808000']); // kahki 
-			cwndAvailLine.set("line", true);
-			cwndAvailLine.set("lineLinewidth", lineWidthCwndAvail);
-			cwndAvailLine.set("backgroundGrid", false);
-			cwndAvailLine.set("scale.formatter", scaleFormatter);
-			//cwndAvailLine.set("lineDash", [5, 5] );
-			lines.push(cwndAvailLine);
-			
-			
-			let currentPhase = "";
-			let cwndUpdates = [];
-			let cwndUpdateEvents  = multistreamDictionary.get("RECOVERY").get("CWND_UPDATE");
-			for( let evt of cwndUpdateEvents ){
-				
-				cwndUpdates.push( [evt.timestamp, evt.details.cwnd] );
-				
-				console.log("Cwnd update", evt.timestamp, evt.details.cwnd);
-				if( evt.details.cc_phase != currentPhase ){
-					console.log("Switched CC phase: " + currentPhase + " -> " + evt.details.cc_phase, evt);
-					currentPhase = evt.details.cc_phase;
-				}
-			}
-			
-			
-			let cwndFixed = [];
-			lastValue = 0;
-			for( let point of cwndUpdates ){
-				if( cwndFixed.length > 0 )
-					cwndFixed.push( [point[0], lastValue] );
-				
-				cwndFixed.push( point ); 
-				lastValue = point[1];
-			}
-			// the final point should go all the way to the right 
-			cwndFixed.push( [ largeMaxX + 1,  cwndFixed[ cwndFixed.length - 1 ][1] ] );
-			cwndFixed[0][0] = 0; // lets it start at the 0-point of the x-axis
-			
-			
-			let lineWidthCwnd = 2 * scale;
-			
-			let cwndLine = new RGraph.Scatter({
-				id: 'recoveryPlot2', 
-				data: cwndFixed
-			});
-			
-			cwndLine.set("tickmarks", null);
-			//cwndLine.set("tickmarks", "diamond");
-			cwndLine.set("ticksize", lineWidthCwnd + 3 * scale);	
-			cwndLine.set("defaultcolor", ['#8A2BE2']);			
-			cwndLine.set("xmax", largeMaxX );
-			cwndLine.set("ymax", largeMaxY );
-			cwndLine.set("line.colors", ['#8A2BE2']); // indigo 
-			cwndLine.set("line", true);
-			cwndLine.set("lineLinewidth", lineWidthCwnd);
-			cwndLine.set("backgroundGrid", false);
-			cwndLine.set("scale.formatter", scaleFormatter);
-			lines.push(cwndLine);
-			*/
+
+
 			
 			let plots = [...scatters, ...lines];
 			
@@ -907,33 +584,16 @@ function drawGraph(qlog, settings){
 			let combo2graphs = [];
 
 			for( let plot of plots ){
-				//console.log("Has y axis disabled", plot.get("noyaxis"), plot.id );
 				if( plot.id.indexOf("2") >= 0 )
 					combo2graphs.push( plot );
 				else
 					combo1graphs.push(plot);
 			}
 			
-			//combo1graphs = combo1graphs.reverse();
 			combo1graphs[0].set("backgroundGrid", true);
 			combo1graphs[0].set("textSize", 7 * scale);
 			combo1graphs[0].set("backgroundGridWidth", 1 * scale);
-			//combo1graphs[0].set("key", ["stream 4", "stream 8", "stream 12", "stream 16", "stream 20"]);
-			//combo1graphs[0].set("keyHalign", "left");
-			//combo1graphs[0].set("keyTextSize", 8 * scale);
-			//combo1graphs[0].set("keyColorShape", ["circle", "square", "line"])
-			/*
-			combo1graphs[0].set("titleXaxis", "time (ms)");
-			combo1graphs[0].set("titleYaxis", "bytes");
-			combo1graphs[0].set("titleXaxisSize", 12 * scale );
-			combo1graphs[0].set("titleXaxisBold", false );
-			combo1graphs[0].set("titleYaxisSize", 12 * scale );
-			combo1graphs[0].set("titleYaxisX", 50 );
-			combo1graphs[0].set("titleYaxisBold", false );
-			*/
 
-			//let canvas = document.getElementById("recoveryPlot");
-			//canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
 
 			let combo = new RGraph.CombinedChart( combo1graphs );
 			combo.draw();
