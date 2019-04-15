@@ -147,8 +147,8 @@ function drawGraph(qlog, settings){
 				// we go over them all, look them up individually, and add them to packetAckedList
 				for( let frame of ackFrames ){
 					for( let range of frame.acked_ranges ){
-						let from = parseInt( range.from );
-						let to = parseInt( range.to ); // up to and including
+						let from = parseInt( range[0] );
+						let to = parseInt( range[1] ); // up to and including
 						
 						// ackedNr will be the ACKed packet number of one of our SENT packets here 
 						for( let ackedNr = from; ackedNr <= to; ++ackedNr ){
