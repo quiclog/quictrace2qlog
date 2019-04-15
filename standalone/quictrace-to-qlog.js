@@ -3,10 +3,26 @@ function convertToQlog(qtrObject, filename){
     
     let {output: events, statistics} = convertEvents(qtrObject.events);
 
+    let totalSent = 0;
+    let totalLost = 0;
+    for( let event of events ){
+        if( event[2] == "PACKET_SENT" )
+            totalSent += 1;
+        else if( event[2] == "PACKET_LOST" )
+            totalLost += 1;
+    }
+
     let qlog = {
         qlog_version: "draft-00",
         title: "Converted from " + filename,
         description: "Converted from " + filename + " by the quictrace-to-qlog tool",
+
+        summary: {
+            trace_count: 1,
+            max_duration: events.length > 0 ? events[ events.length - 1 ][0] : 0, // timestamp field (reference_time is 0, see below)
+            max_outgoing_loss_rate: (totalLost / totalSent).toFixed(3),
+            total_event_count: events.length
+        },
 
         traces: [
             {
