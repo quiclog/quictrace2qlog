@@ -65,6 +65,10 @@
         <form id="upload_file">
             Option 1 : Upload your own file : <input type="file"  class="btn btn-secondary" />
             and <input type="submit" class="btn btn-primary" value="Convert to qlog" /> (or, <a href="#" onclick="return onSubmitQtrJson(event)">download this .qtr file as .qtr.json</a>).
+            <div class="form-check" style="margin-left: 230px; padding-top: 3px;">
+                <input type="checkbox" class="form-check-input" id="autoDownload" checked="checked">
+                <label class="form-check-label" for="autoDownload">Automatically download file after conversion</label>
+            </div>
         </form>
 
         <br/>
@@ -73,7 +77,7 @@
         <br/>
 
         <form id="demo_file">
-                Option 2 : Test with demo file : <input type="submit" class="btn btn-primary" value="Load the github quic-trace example file" />
+                Option 2 : Test with demo file : <input type="submit" class="btn btn-primary" value="Load the github quic-trace example file" /> (<a href="trace_github.qtr">Original .qtr file</a>)
         </form>
     </div>
     <br/><br/>
@@ -319,7 +323,9 @@ This textarea will show the first 50k characters of the qlog result.
                 let baseFilename = file.name.substr(0, file.name.lastIndexOf("."));
                 let extension = (toQlog ? ".qlog" : ".qtr.json" );
 
-                triggerDownload(baseFilename + extension, result);
+                let autoDownload = document.getElementById("autoDownload").checked;
+                if( autoDownload )
+                    triggerDownload(baseFilename + extension, result);
             };
 
             if( file.demo ){
