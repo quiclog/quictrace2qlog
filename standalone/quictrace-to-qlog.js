@@ -155,7 +155,7 @@ function convertEvents(events){
                         {
                             frame_type: "STREAM", 
 
-                            id: frame.streamFrameInfo.streamId,
+                            id: "" + frame.streamFrameInfo.streamId,
                             fin: frame.streamFrameInfo.fin ? frame.streamFrameInfo.fin : false,
                             length: frame.streamFrameInfo.length ? frame.streamFrameInfo.length : 0,
                             offset: frame.streamFrameInfo.offset ? frame.streamFrameInfo.offset : 0
