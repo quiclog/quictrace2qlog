@@ -153,9 +153,9 @@ function convertEvents(events){
 
                     frames.push(
                         {
-                            frame_type: "STREAM",
+                            frame_type: "STREAM", 
 
-                            id: frame.streamFrameInfo.stream_id,
+                            id: frame.streamFrameInfo.streamId,
                             fin: frame.streamFrameInfo.fin ? frame.streamFrameInfo.fin : false,
                             length: frame.streamFrameInfo.length ? frame.streamFrameInfo.length : 0,
                             offset: frame.streamFrameInfo.offset ? frame.streamFrameInfo.offset : 0
@@ -167,7 +167,7 @@ function convertEvents(events){
                     let ackRanges = [];
                     for( let ackBlock of frame.ackInfo.ackedPackets ){
                         ackRanges.push( [ackBlock.firstPacket, ackBlock.lastPacket] );
-                        
+
                         /*
                         ackRanges.push({
                             from: "" + ackBlock.firstPacket,
