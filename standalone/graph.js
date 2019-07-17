@@ -30,7 +30,6 @@ function drawGraph(qlog, settings){
 		let addToDictionary = function( fieldIndices, timeMultiplier, subtractTime, dictionary, evt ){
 			
 			// we want : dictionary[category][event] = { timestamp, trigger, details }
-			
 			let category = evt[ fieldIndices.category ];
 			let evtname  = evt[ fieldIndices.event ];
 			let trigger  = evt[ fieldIndices.trigger ];
@@ -68,7 +67,7 @@ function drawGraph(qlog, settings){
             startTime = logSet.traces[0].events[0][fieldIndices.timestamp];
             subtractTime = startTime;
         }
-			
+
 		fieldIndices.category 	= logSet.traces[0].event_fields.indexOf("CATEGORY"); // typically 1
 		fieldIndices.event 		= logSet.traces[0].event_fields.indexOf("EVENT_TYPE"); // typically 2
 		fieldIndices.trigger 	= logSet.traces[0].event_fields.indexOf("TRIGGER"); // typically 3
@@ -80,11 +79,11 @@ function drawGraph(qlog, settings){
 			timeMultiplier = 0.001;
 		}
 		
+	   
 		for( let evt of logSet.traces[0].events ){
 			addToDictionary( fieldIndices, timeMultiplier, subtractTime * timeMultiplier, multistreamDictionary, evt );
 		}
 		
-		// console.log( multistreamDictionary );
 		
 		{
 			// ------------------------------------------------
@@ -102,9 +101,12 @@ function drawGraph(qlog, settings){
 			// - we need to keep track of which packets contribute which data, so we properly draw the ACKs and LOST events 
 			
 			// - so we create: big sparse array of sent packets with packet number as index, data contains the amount of data it covers 
-			
-			let packetsSent = multistreamDictionary.get("TRANSPORT").get("PACKET_SENT") || []; // || [] defaults to an empty array if there are no events of that type present in the log
-			let packetSentList = [];
+			let packetsSent = [];
+		   let packetSentList = [];
+
+			if (multistreamDictionary.has("TRANSPORT") && multistreamDictionary.get("TRANSPORT").has("PACKET_SENT")) {
+				packetsSent = multistreamDictionary.get("TRANSPORT").get("PACKET_SENT");
+			}
 			
 			let totalSentByteCount = 0;
 			for( let packet of packetsSent ){
@@ -128,39 +130,43 @@ function drawGraph(qlog, settings){
 			let packetAckedList = [];
 			let packetLostList = [];
 			
-			let packetsReceived = multistreamDictionary.get("TRANSPORT").get("PACKET_RECEIVED") || []; // || [] defaults to an empty array if there are no events of that type present in the log
-			for( let packet of packetsReceived ){
-				
-				let data = packet.details;
-				
-				if( !data.frames )
-					continue;
-				
-				let ackFrames = [];
-				for( let frame of data.frames ){
-					if( frame.frame_type == "ACK" )
-						ackFrames.push( frame );
-				}
-				
-				if( ackFrames.length == 0 )
-					continue;
-					
-				// now we have the ACK frames. These are composed of ACK blocks, each ACKing a range of packet numbers 
-				// we go over them all, look them up individually, and add them to packetAckedList
-				for( let frame of ackFrames ){
-					for( let range of frame.acked_ranges ){
-						let from = parseInt( range[0] );
-						let to = parseInt( range[1] ); // up to and including
-						
-						// ackedNr will be the ACKed packet number of one of our SENT packets here 
-						for( let ackedNr = from; ackedNr <= to; ++ackedNr ){
-							// find the originally sent packet 
-							let sentPacket = packetSentList[ ackedNr ]; 
-							if( !sentPacket ){
-								console.error("Packet was ACKed that we didn't send... ignoring", ackedNr, frame, packet);
-								continue;
-							}
-                            
+			let packetsReceived =[];
+		    if (multistreamDictionary.has("TRANSPORT") && multistreamDictionary.get("TRANSPORT").has("PACKET_RECEIVED")) {
+		       packetsReceived = multistreamDictionary.get("TRANSPORT").get("PACKET_RECEIVED");
+            }
+		    
+            for( let packet of packetsReceived ){
+
+                let data = packet.details;
+
+                if( !data.frames )
+                    continue;
+
+                let ackFrames = [];
+                for( let frame of data.frames ){
+                    if( frame.frame_type == "ACK" )
+                        ackFrames.push( frame );
+                }
+
+                if( ackFrames.length == 0 )
+                    continue;
+
+                // now we have the ACK frames. These are composed of ACK blocks, each ACKing a range of packet numbers 
+                // we go over them all, look them up individually, and add them to packetAckedList
+                for( let frame of ackFrames ){
+                    for( let range of frame.acked_ranges ){
+                        let from = parseInt( range[0] );
+                        let to = parseInt( range[1] ); // up to and including
+
+                        // ackedNr will be the ACKed packet number of one of our SENT packets here 
+                        for( let ackedNr = from; ackedNr <= to; ++ackedNr ){
+                            // find the originally sent packet 
+                            let sentPacket = packetSentList[ ackedNr ]; 
+                            if( !sentPacket ){
+                                console.error("Packet was ACKed that we didn't send... ignoring", ackedNr, frame, packet);
+                                continue;
+                            }
+
                             // packets can be acked multiple times across received ACKs (duplicate ACKs). 
                             // This is quite normal in QUIC.
                             // We only want to show the FIRST time a packet was acked, so if the acked number already exists
@@ -168,30 +174,33 @@ function drawGraph(qlog, settings){
                             // TODO: MAYBE it's interesting to show duplicate acks as well, since this gives an indication of how long it took the peer to catch up
                             // e.g., if we have a long vertical line of acks, it means the peer might be sending too large ACK packets
                             if( !packetAckedList[ ackedNr ] )
-							    packetAckedList[ ackedNr ] = { time: packet.timestamp, from: sentPacket.from, to: sentPacket.to };
-						}
-					}
-				}
+                                packetAckedList[ ackedNr ] = { time: packet.timestamp, from: sentPacket.from, to: sentPacket.to };
+                        }
+                    }
+                }
             }
-			
-			let packetsLost = multistreamDictionary.get("RECOVERY").get("PACKET_LOST") || []; // || [] defaults to an empty array if there are no events of that type present in the log
-			for( let packet of packetsLost ){
-				
-				let data = packet.details;
-				if( !data.packet_number ){
-					console.error("Packet was LOST that didn't contain a packet_number field...", packet);
-					continue;
-				}
-				
-				let lostPacketNumber = parseInt( data.packet_number );
-				let sentPacket = packetSentList[ lostPacketNumber ];
-				if( !sentPacket ){
-					console.error("Packet was LOST that we didn't send... ignoring", lostPacketNumber, packet);
-					continue;
-				}
-				
-				packetLostList[ lostPacketNumber ] = { time: packet.timestamp, from: sentPacket.from, to: sentPacket.to };
-			}
+		    
+            let packetsLost = [];
+			if (multistreamDictionary.has("RECOVERY") && multistreamDictionary.get("RECOVERY").has("PACKET_LOST")) {
+				packetsLost = multistreamDictionary.get("RECOVERY").get("PACKET_LOST") || []; // || [] defaults to an empty array if there are no events of that type present in the log
+            }
+            for( let packet of packetsLost ){
+
+                let data = packet.details;
+                if( !data.packet_number ){
+                    console.error("Packet was LOST that didn't contain a packet_number field...", packet);
+                    continue;
+                }
+
+                let lostPacketNumber = parseInt( data.packet_number );
+                let sentPacket = packetSentList[ lostPacketNumber ];
+                if( !sentPacket ){
+                    console.error("Packet was LOST that we didn't send... ignoring", lostPacketNumber, packet);
+                    continue;
+                }
+
+                packetLostList[ lostPacketNumber ] = { time: packet.timestamp, from: sentPacket.from, to: sentPacket.to };
+            }
 			
 			
 			let scatters = [];
@@ -378,7 +387,11 @@ function drawGraph(qlog, settings){
 			
 			for( let scatter of scatters ){
 				scatter.set("xmin", settings.minX );
-				scatter.set("ymin", (packetsSentSizeLUT[0].from < 5000) ? 0 : packetsSentSizeLUT[0].from );
+				if (packetsSentSizeLUT.length > 0 && packetsSentSizeLUT[0].from >= 5000) {
+				  scatter.set("ymin", packetsSentSizeLUT[0].from );
+				} else {
+				  scatter.set("ymin", 0);
+				}
 				scatter.set("xmax", smallMaxX );
 				scatter.set("ymax", smallMaxY );
 			}
@@ -394,7 +407,10 @@ function drawGraph(qlog, settings){
 			
 			let lines = [];
 
-			let metricUpdates = multistreamDictionary.get("RECOVERY").get("METRIC_UPDATE");
+			let metricUpdates = [];
+			if (multistreamDictionary.has("RECOVERY") && multistreamDictionary.get("RECOVERY").has("METRIC_UPDATE")) {
+				metricUpdates = multistreamDictionary.get("RECOVERY").get("METRIC_UPDATE");
+			};
 			
 			let bytesUpdates = [];
 			let cwndupdates = [];
