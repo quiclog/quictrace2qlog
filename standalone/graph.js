@@ -27,7 +27,7 @@ function drawGraph(qlog, settings){
 		let multistreamDictionary = new Map();
 		
 		// we will add the qlog events to a separate dictionary for easy filtering and grouping of events 
-		let addToDictionary = function( fieldIndices, timeMultiplier, dictionary, evt ){
+		let addToDictionary = function( fieldIndices, timeMultiplier, subtractTime, dictionary, evt ){
 			
 			// we want : dictionary[category][event] = { timestamp, trigger, details }
 			
@@ -45,14 +45,15 @@ function drawGraph(qlog, settings){
 				
 			let evtArray = categoryDictionary.get(evtname);
 			
-			let timestamp = (parseInt(evt[fieldIndices.timestamp]) * timeMultiplier); 
+			let timestamp = (parseInt(evt[fieldIndices.timestamp]) * timeMultiplier) - subtractTime; 
 			evtArray.push( { timestamp: timestamp, trigger: trigger, details: data } );
 		}
 		
 		
 		// in qlog, event_fields indicates which fields are actually present for each event and in which order 
 		// so we need to get the indices for the events we need (time, category, event_type, trigger and data) 
-		let startTime = 0;
+        let startTime = 0;
+        let subtractTime = 0;
 		let fieldIndices = {};
 		fieldIndices.timestamp = logSet.traces[0].event_fields.indexOf("time"); // typically 0 
 		if( fieldIndices.timestamp == -1 ){
@@ -63,8 +64,10 @@ function drawGraph(qlog, settings){
 			else
 				startTime = logSet.traces[0].common_fields.reference_time;
 		}
-		else
-			startTime = logSet.traces[0].events[0][fieldIndices.timestamp];
+		else{
+            startTime = logSet.traces[0].events[0][fieldIndices.timestamp];
+            subtractTime = startTime;
+        }
 			
 		fieldIndices.category 	= logSet.traces[0].event_fields.indexOf("CATEGORY"); // typically 1
 		fieldIndices.event 		= logSet.traces[0].event_fields.indexOf("EVENT_TYPE"); // typically 2
@@ -78,7 +81,7 @@ function drawGraph(qlog, settings){
 		}
 		
 		for( let evt of logSet.traces[0].events ){
-			addToDictionary( fieldIndices, timeMultiplier, multistreamDictionary, evt );
+			addToDictionary( fieldIndices, timeMultiplier, subtractTime * timeMultiplier, multistreamDictionary, evt );
 		}
 		
 		// console.log( multistreamDictionary );
@@ -370,7 +373,7 @@ function drawGraph(qlog, settings){
 			smallMaxX = smallMaxX + ( Math.floor(smallMaxX * 0.01)); // add 5% of breathing space to the graph 
 			smallMaxY = smallMaxY + ( Math.floor(smallMaxY * 0.01)); // add 5% of breathing space to the graph
 			
-			smallMaxX = Math.round( smallMaxX / 50 ) * 50;// round to the nearest number divisble by 50
+			smallMaxX = Math.ceil( smallMaxX / 50 ) * 50;// round to the nearest number divisble by 50
 			smallMaxY = Math.ceil( smallMaxY / 5000 ) * 5000;// round to the nearest number divisble by 5000
 			
 			for( let scatter of scatters ){
