@@ -4,7 +4,8 @@ Tooling to go from the quic-trace format to the qlog format.
 Currently, this is a standalone, in-browser converter with a simple visualization.
 It is intended as a general example of how to go from one QUIC/HTTP3 logging format to qlog and how to write tools on top of qlog. 
 
-A live demo can be found at: [https://quic.edm.uhasselt.be/qtr-to-qlog/](https://quic.edm.uhasselt.be/qtr-to-qlog/)
+A live demo can be found at: [https://quic.edm.uhasselt.be/qtr-to-qlog/](https://quic.edm.uhasselt.be/qtr-to-qlog/).
+
 A example of what the visualization looks like:
 ![visualization](example_photo.png)
 
