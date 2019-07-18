@@ -102,7 +102,7 @@ function drawGraph(qlog, settings){
 			
 			// - so we create: big sparse array of sent packets with packet number as index, data contains the amount of data it covers 
 			let packetsSent = [];
-		   let packetSentList = [];
+		    let packetSentList = [];
 
 			if (multistreamDictionary.has("TRANSPORT") && multistreamDictionary.get("TRANSPORT").has("PACKET_SENT")) {
 				packetsSent = multistreamDictionary.get("TRANSPORT").get("PACKET_SENT");
@@ -129,7 +129,6 @@ function drawGraph(qlog, settings){
 			// - now we can create two more lists, which will contain a similar setup for ACKed and LOST packets 
 			let packetAckedList = [];
 			let packetLostList = [];
-			
 			let packetsReceived =[];
 		    if (multistreamDictionary.has("TRANSPORT") && multistreamDictionary.get("TRANSPORT").has("PACKET_RECEIVED")) {
 		       packetsReceived = multistreamDictionary.get("TRANSPORT").get("PACKET_RECEIVED");
