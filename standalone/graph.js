@@ -225,7 +225,7 @@ function drawGraph(qlog, settings){
 				let heightOfPacket = Math.max(1, (obj.context.canvas.clientHeight / yMax) * packetSize); // (pixels per byte) * size in bytes 
 				
 				// packets are always a couple of ms separate, use this logic 
-				let widthOfPacket = Math.max(1, (obj.context.canvas.clientWidth / xMax) * 2); // each packet is 5ms wide, except if that would be smaller than 1 px
+				let widthOfPacket = Math.max(3, (obj.context.canvas.clientWidth / xMax) * 2); // each packet is 5ms wide, except if that would be smaller than 3 px
 				
 				obj.context.lineCap     = 'butt'; // creator forgets to reset these when drawing his drawmarks
 				obj.context.lineJoin    = 'butt'; // creator forgets to reset these when drawing his drawmarks

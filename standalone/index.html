@@ -59,7 +59,8 @@
     <div style="border: 1px solid black; padding: 15px; background-color: #dedede;">
         Upload a .qtr binary file or protobuf .json file in the quic-trace format (code only looks for extension to determine type). <br/>
         You will get an automated download of the file in .qlog json schema (or .qtr to protobuf .qtr.json if you opt for the second button). <br/>
-        You can also upload a proper .qlog file just to have it visualized. 
+        You can also upload a proper .qlog file just to have it visualized. <br/>
+        You can also pass in a .qlog file URL as the "file" query parameter (e.g., ?file=http://example.org/test.qlog). Make sure to <a href="https://enable-cors.org/server.html">set proper CORS headers</a> on the server hosting the .qlog files though!<br/>
         
         <br/><br/>
         
@@ -89,7 +90,7 @@
     <div style="position: relative; margin-left: 50px;">
 
         <div style="float: left;">Min X (ms): <input id="minX" value="0" /><button id="minX_incr">+</button><button id="minX_decr">-</button></div>
-        <div style="float: right; margin-right: 20%;">Max X (ms): <input id="maxX" value="1000" /><button id="maxX_incr">+</button><button id="maxX_decr">-</button></div>
+        <div style="float: right; margin-right: 20%;">Max X (ms): <input id="maxX" value="50000" /><button id="maxX_incr">+</button><button id="maxX_decr">-</button></div>
         <div style="clear: both;"></div>
 
         <canvas id="recoveryPlot" height="600">[No canvas support]</canvas>
@@ -189,6 +190,29 @@ This textarea will show the first 50k characters of the qlog result.
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+        }
+
+        function loadByURL(url){
+            console.log("Loading file remotely from URL", url);
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", url, true);
+            xhr.responseType = 'text';
+            xhr.addEventListener('load',function(){
+                if (xhr.status === 200){
+                    console.log(xhr.response);
+                    convertFile( {name: url, contents: xhr.response, demo: true}, true );
+                }
+                else
+                    alert("File passed in URL could not be loaded : " + xhr.status );
+            });
+
+            xhr.addEventListener('error',function(e){
+                alert("ERROR: File passed in URL could not be loaded. Are you sure you've set the appropriate CORS headers? Please check the console logs in your browser's devtools. " + xhr.status );
+            });
+
+            xhr.send();
+
+            return false;
         }
 
         function onSubmitDemo(e){
@@ -411,6 +435,11 @@ This textarea will show the first 50k characters of the qlog result.
 
         document.querySelector("#upload_file").addEventListener("submit", onSubmitQlog);
         document.querySelector("#demo_file").addEventListener("submit", onSubmitDemo);
+
+        let urlParams = new URLSearchParams(window.location.search);
+        if( urlParams && urlParams.has("file") ){
+            loadByURL( urlParams.get("file") );
+        }
 
     </script>
 
