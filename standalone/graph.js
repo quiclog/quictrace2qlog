@@ -218,14 +218,14 @@ function drawGraph(qlog, settings){
 			}
 			
 			// because rgraph doesn't allow a simple vertical line as a tickmark...
-			function verticalTick ( packetSizeLUT, obj, data, x, y, xVal, yVal, xMax, yMax, color, dataset_index, data_index)
+			function verticalTick ( packetSizeLUT, xMin, obj, data, x, y, xVal, yVal, xMax, yMax, color, dataset_index, data_index)
 			{
 				let packet = packetSizeLUT[data_index];
 				let packetSize = packet.to - packet.from; 
 				let heightOfPacket = Math.max(1, (obj.context.canvas.clientHeight / yMax) * packetSize); // (pixels per byte) * size in bytes 
 				
 				// packets are always a couple of ms separate, use this logic 
-				let widthOfPacket = Math.max(3, (obj.context.canvas.clientWidth / xMax) * 2); // each packet is 5ms wide, except if that would be smaller than 3 px
+				let widthOfPacket = Math.max(3, (obj.context.canvas.clientWidth / (xMax - xMin)) * 2); // each packet is 5ms wide, except if that would be smaller than 5 px
 				
 				obj.context.lineCap     = 'butt'; // creator forgets to reset these when drawing his drawmarks
 				obj.context.lineJoin    = 'butt'; // creator forgets to reset these when drawing his drawmarks
@@ -279,7 +279,7 @@ function drawGraph(qlog, settings){
 			packetsSentScatter.set("scaleThousand", "");
 			packetsSentScatter.set("backgroundGrid", false);
 			packetsSentScatter.set("defaultcolor", "#0000FF");
-			packetsSentScatter.set("tickmarks", (...args) => verticalTick(packetsSentSizeLUT, ...args));
+			packetsSentScatter.set("tickmarks", (...args) => verticalTick(packetsSentSizeLUT, settings.minX, ...args));
 				
 			scatters.push( packetsSentScatter ); 
 			
@@ -320,7 +320,7 @@ function drawGraph(qlog, settings){
 			packetsAckedScatter.set("line", false);
 			packetsAckedScatter.set("xscale", false); // x-labels would be messed up otherwhise 
 			packetsAckedScatter.set("defaultcolor", "#6B8E23"); // green
-			packetsAckedScatter.set("tickmarks",  (...args) => verticalTick(packetsAckedSizeLUT, ...args));
+			packetsAckedScatter.set("tickmarks",  (...args) => verticalTick(packetsAckedSizeLUT, settings.minX, ...args));
 				
 			scatters.push( packetsAckedScatter ); 
 			
@@ -362,7 +362,7 @@ function drawGraph(qlog, settings){
 			packetsLostScatter.set("line", false);
 			packetsLostScatter.set("xscale", false); // x-labels would be messed up otherwhise 
 			packetsLostScatter.set("defaultcolor", "#FF0000"); // red
-			packetsLostScatter.set("tickmarks",  (...args) => verticalTick(packetsLostSizeLUT, ...args));
+			packetsLostScatter.set("tickmarks",  (...args) => verticalTick(packetsLostSizeLUT, settings.minX, ...args));
 				
 			scatters.push( packetsLostScatter );
 			
