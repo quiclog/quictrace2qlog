@@ -103,7 +103,6 @@ function drawGraph(qlog, settings){
 			// - so we create: big sparse array of sent packets with packet number as index, data contains the amount of data it covers 
 			let packetsSent = [];
 		    let packetSentList = [];
-
 			if (multistreamDictionary.has("TRANSPORT") && multistreamDictionary.get("TRANSPORT").has("PACKET_SENT")) {
 				packetsSent = multistreamDictionary.get("TRANSPORT").get("PACKET_SENT");
 			}
