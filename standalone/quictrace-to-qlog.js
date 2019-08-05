@@ -1,19 +1,19 @@
 
 function convertToQlog(qtrObject, filename){
-    
+
     let {output: events, statistics} = convertEvents(qtrObject.events);
 
     let totalSent = 0;
     let totalLost = 0;
     for( let event of events ){
-        if( event[2] == "PACKET_SENT" )
+        if( event[2] == "packet_sent" )
             totalSent += 1;
-        else if( event[2] == "PACKET_LOST" )
+        else if( event[2] == "packet_lost" )
             totalLost += 1;
     }
 
     let qlog = {
-        qlog_version: "draft-00",
+        qlog_version: "draft-01",
         title: "Converted from " + filename,
         description: "Converted from " + filename + " by the quictrace-to-qlog tool",
 
@@ -27,7 +27,7 @@ function convertToQlog(qtrObject, filename){
         traces: [
             {
                 vantage_point: {
-                    type: "SERVER",
+                    type: "server",
                     name: "Probably server, because debugging congestion stuff"
                 },
                 title: "QuicTrace only has a single connection per file",
@@ -40,7 +40,7 @@ function convertToQlog(qtrObject, filename){
 
                 common_fields: {
                     reference_time: 0, // quictrace files do not include an epoch timestamp
-                    group_id: qtrObject.destinationConnectionId ? qtrObject.destinationConnectionId : "UNKNOWN",
+                    group_id: qtrObject.destinationConnectionId ? qtrObject.destinationConnectionId : "unknown",
                     dcid: qtrObject.destinationConnectionId, // just additional metadata, not to be used in tools
                     scid: qtrObject.sourceConnectionId, // just additional metadata, not to be used in tools
                     protocol_type:  "QUIC_HTTP3"
@@ -48,10 +48,10 @@ function convertToQlog(qtrObject, filename){
 
                 event_fields: [
                     "relative_time",
-                    "CATEGORY",
-                    "EVENT_TYPE",
-                    "TRIGGER",
-                    "DATA"
+                    "category",
+                    "event",
+                    "trigger",
+                    "data"
                 ],
 
                 events: events
@@ -64,24 +64,24 @@ function convertToQlog(qtrObject, filename){
     return { qlog, statistics };
 }
 
-// quic-trace currently has no support for RETRY or VERSION_NEGOTIATION packets 
+// quic-trace currently has no support for RETRY or VERSION_NEGOTIATION packets
 let encryptionLevelToPacketType = {
-    "ENCRYPTION_INITIAL" : "INITIAL",
-    "ENCRYPTION_HANDSHAKE" : "HANDSHAKE",
+    "ENCRYPTION_INITIAL" : "initial",
+    "ENCRYPTION_HANDSHAKE" : "handshake",
     "ENCRYPTION_0RTT" : "0RTT",
     "ENCRYPTION_1RTT" : "1RTT",
 
-    "ENCRYPTION_UNKNOWN" : "UNKNOWN"
+    "ENCRYPTION_UNKNOWN" : "unknown"
 };
 
-// quic-trace doesn't yet have support for post draft-14 loss recovery logic 
+// quic-trace doesn't yet have support for post draft-14 loss recovery logic
 let reasonToTrigger = {
-    "NORMAL_TRANSMISSION": "DEFAULT",
-    "TAIL_LOSS_PROBE": "RETRANSMIT_PTO",
-    "RTO_RETRANSMISSION": "RETRANSMIT_PTO",
-    "PROBING_TRANSMISSION": "CC_BANDWIDTH_PROBE"
+    "NORMAL_TRANSMISSION": "default",
+    "TAIL_LOSS_PROBE": "retransmit_pto",
+    "RTO_RETRANSMISSION": "retransmit_pto",
+    "PROBING_TRANSMISSION": "cc_bandwidth_probe"
 };
-  
+
 // quic-trace does not log: rtt variance or max_ack_delay
 let transportStateToMetric = {
     "minRttUs": "min_rtt",
@@ -110,7 +110,7 @@ function convertEvents(events){
     // in practice, many of these values stay exactly the same, so we would be logging things twice or more
     // keep a cache per-value and only log if the value actually changes
     // updateCount + valueList is just to get an idea of how "bad" the duplication is in practice
-    // presentCount is to get a feel for what people are logging (e.g., cc_state and pacing_rate_bps are probably not very popular?) 
+    // presentCount is to get a feel for what people are logging (e.g., cc_state and pacing_rate_bps are probably not very popular?)
     let transportStateCache = new Map();
     transportStateCache.set("minRttUs",               { updateCount: 0, presentCount: 0, valueList: [], currentValue: -1} );
     transportStateCache.set("smoothedRttUs",          { updateCount: 0, presentCount: 0, valueList: [], currentValue: -1} );
@@ -145,7 +145,7 @@ function convertEvents(events){
                 if( statistics.frameTypes.has(frame.frameType) ){
                     statistics.frameTypes.set( frame.frameType, statistics.frameTypes.get( frame.frameType ) + 1);
                 }
-                else 
+                else
                     statistics.frameTypes.set( frame.frameType, 0);
 
 
@@ -153,7 +153,7 @@ function convertEvents(events){
 
                     frames.push(
                         {
-                            frame_type: "STREAM", 
+                            frame_type: "stream",
 
                             id: "" + frame.streamFrameInfo.streamId,
                             fin: frame.streamFrameInfo.fin ? frame.streamFrameInfo.fin : false,
@@ -178,7 +178,7 @@ function convertEvents(events){
 
                     frames.push(
                         {
-                            frame_type: "ACK",
+                            frame_type: "ack",
 
                             acked_ranges: ackRanges,
                             ack_delay: frame.ackInfo.ack_delay_us ? frame.ackInfo.ack_delay_us : 0
@@ -189,7 +189,7 @@ function convertEvents(events){
 
                     frames.push(
                         {
-                            frame_type: "RESET_STREAM",
+                            frame_type: "reset_stream",
                             info: "frame type NOT SUPPORTED IN quic-trace to qlog converter yet"
                         }
                     );
@@ -201,13 +201,13 @@ function convertEvents(events){
                         optional uint64 final_offset = 3;
                         };
                         */
-                    
+
                 }
                 else if( frame.frameType == "CONNECTION_CLOSE"){
-                    
+
                     frames.push(
                         {
-                            frame_type: "CONNECTION_CLOSE",
+                            frame_type: "connection_close",
                             info: "frame type NOT SUPPORTED IN quic-trace to qlog converter yet"
                         }
                     );
@@ -221,10 +221,10 @@ function convertEvents(events){
 
                 }
                 else if( frame.frameType == "MAX_DATA"){
-                    
+
                     frames.push(
                         {
-                            frame_type: "MAX_DATA",
+                            frame_type: "max_data",
                             info: "frame type NOT SUPPORTED IN quic-trace to qlog converter yet"
                         }
                     );
@@ -240,7 +240,7 @@ function convertEvents(events){
 
                     frames.push(
                         {
-                            frame_type: "MAX_STREAM_DATA",
+                            frame_type: "max_stream_data",
                             info: "frame type NOT SUPPORTED IN quic-trace to qlog converter yet"
                         }
                     );
@@ -253,10 +253,10 @@ function convertEvents(events){
                     */
                 }
                 else if( frame.frameType == "UNKNOWN_FRAME"){
-                    
+
                     frames.push(
                         {
-                            frame_type: "UNKNOWN"
+                            frame_type: "unknown"
                         }
                     );
                 }
@@ -273,74 +273,74 @@ function convertEvents(events){
                 }
             }
         }
-  
+
 
         if( event.eventType == "PACKET_SENT" ){
 
             let data = {
-                packet_type: event.encryptionLevel ? encryptionLevelToPacketType[ event.encryptionLevel ] : "UNKNOWN_NOT_PRESENT_IN_QTR",
+                packet_type: event.encryptionLevel ? encryptionLevelToPacketType[ event.encryptionLevel ] : "unknown_not_present_in_qtr",
                 header:{
                     packet_number: "" + event.packetNumber,
                     packet_size: event.packetSize
                 },
                 frames: frames
             };
-            
-            qlogEvent = [ 
-                "" + event.timeUs, 
-                "TRANSPORT", 
-                "PACKET_SENT", 
-                event.transmissionReason ? reasonToTrigger[event.transmissionReason] : "DEFAULT", 
+
+            qlogEvent = [
+                "" + event.timeUs,
+                "transport",
+                "packet_sent",
+                event.transmissionReason ? reasonToTrigger[event.transmissionReason] : "default",
                 data
             ];
         }
         else if( event.eventType == "PACKET_RECEIVED" ){
 
             let data = {
-                packet_type: event.encryptionLevel ? encryptionLevelToPacketType[ event.encryptionLevel ] : "UNKNOWN_NOT_PRESENT_IN_QTR",
+                packet_type: event.encryptionLevel ? encryptionLevelToPacketType[ event.encryptionLevel ] : "unknown_not_present_in_qtr",
                 header:{
                     packet_number: "" + event.packetNumber,
                     packet_size: event.packetSize
                 },
                 frames: frames
             };
-            
-            qlogEvent = [ 
-                "" + event.timeUs, 
-                "TRANSPORT", 
-                "PACKET_RECEIVED", 
-                event.transmissionReason ? reasonToTrigger[event.transmissionReason] : "DEFAULT", 
+
+            qlogEvent = [
+                "" + event.timeUs,
+                "transport",
+                "packet_received",
+                event.transmissionReason ? reasonToTrigger[event.transmissionReason] : "default",
                 data
             ];
-        } 
+        }
         else if( event.eventType == "PACKET_LOST" ){
-            
+
             let data = {
                 packet_number: "" + event.packetNumber
             };
 
-            qlogEvent = [ 
-                "" + event.timeUs, 
-                "RECOVERY", 
-                "PACKET_LOST", 
-                "UNKNOWN", // quic-trace does not log reasons for why a packet was deemed "lost" (e.g., ACK, timeout, reorder threshold, etc.) 
+            qlogEvent = [
+                "" + event.timeUs,
+                "recovery",
+                "packet_lost",
+                "unknown", // quic-trace does not log reasons for why a packet was deemed "lost" (e.g., ACK, timeout, reorder threshold, etc.)
                 data
             ];
 
-        } 
+        }
         else if( event.eventType == "APPLICATION_LIMITED" ){
 
             // note: this event is not in the I-D at this moment.
             // We see it as an application-specific log that custom tools would react to.
 
-            qlogEvent = [ 
-                "" + event.timeUs, 
-                "RECOVERY", 
-                "CUSTOM_CC_APPLICATION_LIMITED", 
-                "UNKNOWN", // quic-trace does not log reasons for why we were application limited
-                {} // quic-trace doesn't log any extra contextual data for APPLICATION_LIMITED events 
+            qlogEvent = [
+                "" + event.timeUs,
+                "recovery",
+                "custom_cc_application_limited",
+                "unknown", // quic-trace does not log reasons for why we were application limited
+                {} // quic-trace doesn't log any extra contextual data for APPLICATION_LIMITED events
             ];
-        } 
+        }
         else if( event.eventType == "EXTERNAL_PARAMETERS" ){
             // external parameters aren't used that much yet
             // mainly for things like NetInfo saying what type of connection you might expect
@@ -349,33 +349,33 @@ function convertEvents(events){
             // for the logging itself:
             // https://cs.chromium.org/chromium/src/net/third_party/quiche/src/quic/core/quic_trace_visitor.h?sq=package:chromium&g=0&l=17
             // https://cs.chromium.org/chromium/src/net/third_party/quiche/src/quic/core/quic_trace_visitor.cc?sq=package:chromium&g=0&l=278
-        
+
             // note: this event is not in the I-D at this moment.
             // We see it as an application-specific log that custom tools would react to.
 
-            qlogEvent = [ 
-                "" + event.timeUs, 
-                "RECOVERY", 
-                "CUSTOM_EXTERNAL_NETWORK_PARAMETERS", 
-                "UNKNOWN", // quic-trace does not log reasons for this
+            qlogEvent = [
+                "" + event.timeUs,
+                "recovery",
+                "custom_external_network_parameters",
+                "unknown", // quic-trace does not log reasons for this
                 {
                     bandwidth: event.externalNetworkParameters.bandwidthBps,
                     rtt: event.externalNetworkParameters.rttUs,
                     cwnd: event.externalNetworkParameters.cwndBytes
                 }
             ];
-        
+
         }
         else{
-            // the quic-trace .proto also mentions an EXTERNAL_PARAMETERS event type, 
+            // the quic-trace .proto also mentions an EXTERNAL_PARAMETERS event type,
             // but this hasn't yet been observed in any of the seen quic-trace files
             console.error("convertEvents: Unknown event type : ", event.eventType);
 
-            qlogEvent = [ 
-                "" + event.timeUs, 
-                "UNKNOWN", 
-                event.eventType, 
-                "UNKNOWN",
+            qlogEvent = [
+                "" + event.timeUs,
+                "unknown",
+                event.eventType,
+                "unknown",
                 {}
             ];
         }
@@ -406,13 +406,13 @@ function convertEvents(events){
         // in quic-trace, transportState is part of a PACKET_SENT/RECEIVED
         // in qlog, they are logged as separate events
         if( event.transportState === undefined || event.transportState === null ){
-            // TODO: this is not an error per se: show in statistics, not as error 
+            // TODO: this is not an error per se: show in statistics, not as error
             //console.error("convertEvents: event has no transportState set...", event);
             statistics.eventsMissingTransportState += 1;
         }
         else{
             const metricNames = Object.keys(event.transportState);
-            
+
             let metrics = {};
 
             for( let metricName of metricNames  ){
@@ -433,14 +433,14 @@ function convertEvents(events){
                         ccdata.old = cachedInfo.currentValue;
                         ccdata.new = newvalue;
 
-                        qlogEvent = [ 
-                            "" + event.timeUs, 
-                            "RECOVERY", 
-                            "CC_STATE_UPDATE", 
-                            "DEFAULT",
+                        qlogEvent = [
+                            "" + event.timeUs,
+                            "recovery",
+                            "cc_state_update",
+                            "default",
                             ccdata
                         ];
-        
+
                         output.push( qlogEvent );
                     }
                     else // all other metrics belong together in METRIC_UPDATE
@@ -454,11 +454,11 @@ function convertEvents(events){
             }
 
             if( Object.keys(metrics).length > 0 ){
-                qlogEvent = [ 
-                    "" + event.timeUs, 
-                    "RECOVERY", 
-                    "METRIC_UPDATE", 
-                    "DEFAULT",
+                qlogEvent = [
+                    "" + event.timeUs,
+                    "recovery",
+                    "metric_update",
+                    "default",
                     metrics
                 ];
 
