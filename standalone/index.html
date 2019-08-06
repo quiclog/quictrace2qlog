@@ -273,6 +273,85 @@ This textarea will show the first 50k characters of the qlog result.
                     document.getElementById("output").innerHTML = contents.substr(0, 50000) + "\n\nLook in the generated file for more data...";
                     document.getElementById("output").style.height = "400px";
 
+                    // we don't convert anything, so we don't have statistics yet
+                    // so gather some high-level ones here
+                    // TODO: a proper implementation wouldn't have the same code for this twice...
+                    let statistics = {};
+                    statistics.eventTypes = new Map();
+                    statistics.frameTypes = new Map();
+                    statistics.encryptionLevels = new Map();
+                    statistics.eventCount = 0;
+                    statistics.eventsMissingPacketNumber = 0;
+
+                    for( let trace of currentQlog.traces ){
+
+                        statistics.eventCount += trace.events.length;
+
+                        for( let qlogEvent of trace.events ){
+
+                            if( qlogEvent[4].frames ){
+                                for( let frame of qlogEvent[4].frames ){
+                                    if( statistics.frameTypes.has( frame.frame_type ) ){
+                                        statistics.frameTypes.set( frame.frame_type, statistics.frameTypes.get( frame.frame_type ) + 1);
+                                    }
+                                    else
+                                        statistics.frameTypes.set( frame.frame_type, 1);
+                                }
+                            }
+
+                            if( statistics.eventTypes.has( qlogEvent[2] ) ){
+                                let currentvalue = statistics.eventTypes.get(qlogEvent[2]);
+                                statistics.eventTypes.set( qlogEvent[2], currentvalue + 1 );
+                            }
+                            else
+                                statistics.eventTypes.set( qlogEvent[2], 1 );
+
+
+                            if( qlogEvent[4].packet_type ){
+                                let packetType = qlogEvent[4].packet_type;
+                                if( statistics.encryptionLevels.has( packetType ) ){
+                                    let currentvalue = statistics.encryptionLevels.get(packetType);
+                                    statistics.encryptionLevels.set( packetType, currentvalue + 1 );
+                                }
+                                else
+                                    statistics.encryptionLevels.set( packetType, 1 );
+                            }
+
+                            if( qlogEvent[4].header && qlogEvent[4].header.packet_number === "" ){
+                                statistics.eventsMissingPacketNumber += 1;
+                            }
+
+                        }
+                    }
+
+                    let statstring = "";
+                    statstring += `<h3>Statistics for qlog file ${file.name}:</h3>`;
+
+                    if(statistics.eventsMissingPacketNumber > 0){
+                        statstring += `<p class="statistics_error">ERROR: The input file has ${statistics.eventsMissingPacketNumber} events that are missing the "packet_number" field.</p>`;
+                    }
+
+                    statstring += `Total event count: <b>${statistics.eventCount}</b>, in ${currentQlog.traces.length} trace(s), spread over these types:<br/>`;
+                    statistics.eventTypes.forEach((v, k, m) => statstring += `- Type: ${k} Count: ${v}<br/>`);
+
+                    statstring += "<br/>";
+
+                    statstring += `Encryption levels:<br/>`;
+                    statistics.encryptionLevels.forEach((v, k, m) => { 
+                        if( k.indexOf("UNKNOWN") >= 0 )
+                            statstring += `<span style="color: red; font-weight: bold;">- Level: ${k} Count: ${v}</span><br/>`
+                        else
+                            statstring += `- Level: ${k} Count: ${v}<br/>`;
+                    });
+
+                    statstring += "<br/>";
+
+                    statstring += `Frame types:<br/>`;
+                    statistics.frameTypes.forEach((v, k, m) => statstring += `- Type: ${k} Count: ${v}<br/>`)
+
+                    document.getElementById("statistics").innerHTML = statstring;
+
+
                     return;
                 }
 

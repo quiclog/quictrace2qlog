@@ -166,7 +166,7 @@ function convertEvents(events){
 
                     let ackRanges = [];
                     for( let ackBlock of frame.ackInfo.ackedPackets ){
-                        ackRanges.push( [ackBlock.firstPacket, ackBlock.lastPacket] );
+                        ackRanges.push( ["" + ackBlock.firstPacket, "" + ackBlock.lastPacket] );
 
                         /*
                         ackRanges.push({
