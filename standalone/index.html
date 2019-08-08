@@ -30,8 +30,17 @@
           font-weight: normal;
           font-size: 0.9em;
       }
+
+      .grid line {
+          stroke: #ddd;
+      }
+
+      .nogrid line {
+          stroke: #ffffff;
+      }
   </style>
- 
+
+    <script src="js/d3js/d3.js"></script>
     <script src="js/rgraph/RGraph.common.core.js"></script>
     <script src="js/rgraph/RGraph.common.key.js"></script>
     <!--<script src="js/rgraph/RGraph.common.dynamic.js" ></script>-->
@@ -50,7 +59,7 @@
 </head>
 
 <body>
-    
+
     <h1 style="margin-top: 5px;">quic-trace to qlog converter</h1>
 
     There are currently two main logging formats for QUIC: <a href="https://github.com/google/quic-trace">quic-trace</a> and <a href="https://github.com/quiclog/internet-drafts">qlog</a>.<br/>
@@ -61,9 +70,9 @@
         You will get an automated download of the file in .qlog json schema (or .qtr to protobuf .qtr.json if you opt for the second button). <br/>
         You can also upload a proper .qlog file just to have it visualized. <br/>
         You can also pass in a .qlog file URL as the "file" query parameter (e.g., ?file=http://example.org/test.qlog). Make sure to <a href="https://enable-cors.org/server.html">set proper CORS headers</a> on the server hosting the .qlog files though!<br/>
-        
+
         <br/><br/>
-        
+
         <form id="upload_file">
             Option 1 : Upload your own file : <input type="file"  class="btn btn-secondary" />
             and <input type="submit" class="btn btn-primary" value="Convert to qlog" /> (or, <a href="#" onclick="return onSubmitQtrJson(event)">download this .qtr file as .qtr.json</a>).
@@ -86,70 +95,78 @@
 
 
 
-<div id="graphContainer" style="display: none;">
+<div id="graphContainer" style="display: none">
+    <button type="button" onclick="resetZoom()">Reset zoom</button>
+    <button type="button" onclick="useBrushX()">Use horizontal brush</button>
+    <button type="button" onclick="useBrush2d()">Use 2d brush</button>
+    <button type="button" onclick="usePanning()">Use panning controls</button>
+    <button type="button" onclick="useSelection()">Use selection</button>
+    <button type="button" onclick="usePicker()">Use picker</button>
     <div style="position: relative; margin-left: 50px;">
-
+        <!--
         <div style="float: left;">Min X (ms): <input id="minX" value="0" /><button id="minX_incr">+</button><button id="minX_decr">-</button></div>
         <div style="float: right; margin-right: 20%;">Max X (ms): <input id="maxX" value="50000" /><button id="maxX_incr">+</button><button id="maxX_decr">-</button></div>
         <div style="clear: both;"></div>
 
         <canvas id="recoveryPlot" height="600">[No canvas support]</canvas>
-    
+
         <div class="axisTitle" id="titleLeftTop"    style="position: absolute; top: 360px; left: 45px; transform: rotate(270deg) translate3d(0, 0, 0); transform-origin: left top 0;">data (bytes)</div>
         <div class="axisTitle" id="titleLeftBottom" style="position: absolute; top: 730px; left: -30px; transform: rotate(270deg) translate3d(0, 0, 0); transform-origin: left top 0;">time (ms)</div>
-    
-        <div id="legend1" style="padding: 5px; border: 1px solid black; background-color: white; position: absolute; top: 55px; left: 40px; z-index: 100;">
-            
-        <p style="padding: 0; margin: 10px 0;"> 
-            <span style="width: 12px; height: 8px; background-color: blue; display: inline-block; margin-right: 1px; vertical-align: middle;"></span> 
+         -->
+        <div id="legend1" style="padding: 5px; border: 1px solid black; background-color: white; position: absolute; top: 40px; left: 70px; z-index: 100;">
+
+        <p style="padding: 0; margin: 10px 0;">
+            <span style="width: 12px; height: 8px; background-color: blue; display: inline-block; margin-right: 1px; vertical-align: middle;"></span>
             : PACKET_SENT
         </p>
-        <p style="padding: 0; margin: 10px 0;"> 
-            <span style="width: 12px; height: 8px; background-color: #6B8E23; display: inline-block; margin-right: 1px; vertical-align: middle;"></span> 
+        <p style="padding: 0; margin: 10px 0;">
+            <span style="width: 12px; height: 8px; background-color: #6B8E23; display: inline-block; margin-right: 1px; vertical-align: middle;"></span>
             : PACKET_ACKED
         </p>
-        <p style="padding: 0; margin: 10px 0;"> 
-            <span style="width: 12px; height: 8px; background-color: red; display: inline-block; margin-right: 1px; vertical-align: middle;"></span> 
+        <p style="padding: 0; margin: 10px 0;">
+            <span style="width: 12px; height: 8px; background-color: red; display: inline-block; margin-right: 1px; vertical-align: middle;"></span>
             : PACKET_LOST
         </p>
-        <p style="padding: 0; margin: 10px 0;"> 
-            <span style="width: 12px; height: 8px; background-color: #8A2BE2; display: inline-block; margin-right: 1px; vertical-align: middle;"></span> 
+        <p style="padding: 0; margin: 10px 0;">
+            <span style="width: 12px; height: 8px; background-color: #8A2BE2; display: inline-block; margin-right: 1px; vertical-align: middle;"></span>
             : Congestion window
         </p>
-        <p style="padding: 0; margin: 10px 0;"> 
-            <span style="width: 12px; height: 8px; background-color: #808000; display: inline-block; margin-right: 1px; vertical-align: middle;"></span> 
+        <p style="padding: 0; margin: 10px 0;">
+            <span style="width: 12px; height: 8px; background-color: #808000; display: inline-block; margin-right: 1px; vertical-align: middle;"></span>
             : Bytes in flight
         </p>
 
         </div>
     </div>
-        
 
+    <!--
     <div style="position: relative; margin-left: 50px;">
         <canvas id="recoveryPlot2" width="200" height="200">[No canvas support]</canvas>
-        
+
         <div id="legend2" style="padding: 5px; border: 1px solid black; background-color: white; position: absolute; top: -5px; right: 25%; z-index: 100;">
-            
-        <p style="padding: 0; margin: 3px 15px; display: inline;"> 
+
+        <p style="padding: 0; margin: 3px 15px; display: inline;">
             <span style="width: 32px; height: 8px; background-color: #C96480; display: inline-block; margin-right: 1px; vertical-align: middle;"></span>
             : Min RTT
         </p>
-        
-        <p style="padding: 0; margin: 3px 15px; display: inline;"> 
+
+        <p style="padding: 0; margin: 3px 15px; display: inline;">
             <span style="width: 32px; height: 8px; background-color: #ff9900; display: inline-block; margin-right: 1px; vertical-align: middle;"></span>
             : Latest RTT
         </p>
-        <p style="padding: 0; margin: 3px 15px; display: inline;"> 
+        <p style="padding: 0; margin: 3px 15px; display: inline;">
             <span style="width: 32px; height: 8px; background-color: #8a554a; display: inline-block; margin-right: 1px; vertical-align: middle;"></span>
             : Smoothed RTT
         </p>
         </div>
-        
+
         <div class="axisTitle" id="titleBottom" style="width: 80%; text-align: center;">time (ms)</div>
     </div>
+    -->
 </div>
+<br/><br/>
 <div id="graphExplanation" style="border: 1px solid black; padding: 5px; text-align: center;">
-    This area will contain a very rudimentary, low-interactive visualization based on quic-trace's tool. 
+    This area will contain a very rudimentary, low-interactive visualization based on quic-trace's tool.
 </div>
 
 <br/><br/>
@@ -158,7 +175,7 @@
 
     <div style="width: 50%; float: left;">
         <textarea id="output" style="width: 98%; padding: 0px; min-height: 100px;">
-This textarea will show the first 50k characters of the qlog result. 
+This textarea will show the first 50k characters of the qlog result.
         </textarea>
     </div>
 
@@ -269,15 +286,15 @@ This textarea will show the first 50k characters of the qlog result.
                 if( file.name.endsWith(".qlog") ){
                     currentQlog = JSON.parse(contents);
                     drawCurrentQlog();
-                    
+
                     document.getElementById("output").innerHTML = contents.substr(0, 50000) + "\n\nLook in the generated file for more data...";
                     document.getElementById("output").style.height = "400px";
 
                     return;
                 }
 
-                // .qtr is binary protocol buffer format 
-                // need to transform this into a javascript object 
+                // .qtr is binary protocol buffer format
+                // need to transform this into a javascript object
                 let decodedObject = null;
                 if( file.name.endsWith(".qtr") ){
 
@@ -288,7 +305,7 @@ This textarea will show the first 50k characters of the qlog result.
                         bytes: String,  // bytes as base64 encoded strings
                         defaults: true // includes default values
                     });
-                }   
+                }
                 else{
                     // got a .json object, just need to read it
                     decodedObject = JSON.parse( contents );
@@ -328,7 +345,7 @@ This textarea will show the first 50k characters of the qlog result.
                     statstring += "<br/>";
 
                     statstring += `Encryption levels:<br/>`;
-                    statistics.encryptionLevels.forEach((v, k, m) => { 
+                    statistics.encryptionLevels.forEach((v, k, m) => {
                         if( k.indexOf("UNKNOWN") >= 0 )
                             statstring += `<span style="color: red; font-weight: bold;">- Level: ${k} Count: ${v}</span><br/>`
                         else
@@ -352,7 +369,7 @@ This textarea will show the first 50k characters of the qlog result.
                     document.getElementById("statistics").innerHTML = statstring;
                 }
 
-                console.log("Final JSON output : ", result); 
+                console.log("Final JSON output : ", result);
 
 
 
@@ -388,49 +405,49 @@ This textarea will show the first 50k characters of the qlog result.
                 return;
             }
 
-            let minX = parseInt(document.querySelector("#minX").value);
-            let maxX = parseInt(document.querySelector("#maxX").value);
+            // let minX = parseInt(document.querySelector("#minX").value);
+            // let maxX = parseInt(document.querySelector("#maxX").value);
 
-            drawGraph( currentQlog, {minX, maxX} );
+            drawGraphd3( currentQlog, {minX: 0, maxX: 99999999} );
         }
 
-        document.querySelector("#minX_incr").addEventListener("click", (e) => {
-            let curvalue = parseInt(document.querySelector("#minX").value);
-            curValue = curvalue + 100;
-            document.querySelector("#minX").value = curValue;
+        // document.querySelector("#minX_incr").addEventListener("click", (e) => {
+        //     let curvalue = parseInt(document.querySelector("#minX").value);
+        //     curValue = curvalue + 100;
+        //     document.querySelector("#minX").value = curValue;
 
-            drawCurrentQlog();
-        });
-        document.querySelector("#minX_decr").addEventListener("click", (e) => {
-            let curvalue = parseInt(document.querySelector("#minX").value);
-            curValue = Math.max(0, curvalue - 100);
-            document.querySelector("#minX").value = curValue;
+        //     drawCurrentQlog();
+        // });
+        // document.querySelector("#minX_decr").addEventListener("click", (e) => {
+        //     let curvalue = parseInt(document.querySelector("#minX").value);
+        //     curValue = Math.max(0, curvalue - 100);
+        //     document.querySelector("#minX").value = curValue;
 
-            drawCurrentQlog();
-        });
-        document.querySelector("#maxX_decr").addEventListener("click", (e) => {
-            let curvalue = parseInt(document.querySelector("#maxX").value);
-            curValue = Math.max(100, curvalue - 100);
-            document.querySelector("#maxX").value = curValue;
+        //     drawCurrentQlog();
+        // });
+        // document.querySelector("#maxX_decr").addEventListener("click", (e) => {
+        //     let curvalue = parseInt(document.querySelector("#maxX").value);
+        //     curValue = Math.max(100, curvalue - 100);
+        //     document.querySelector("#maxX").value = curValue;
 
-            drawCurrentQlog();
-        });
-        document.querySelector("#maxX_incr").addEventListener("click", (e) => {
-            let curvalue = parseInt(document.querySelector("#maxX").value);
-            curValue = curvalue + 100;
-            document.querySelector("#maxX").value = curValue;
+        //     drawCurrentQlog();
+        // });
+        // document.querySelector("#maxX_incr").addEventListener("click", (e) => {
+        //     let curvalue = parseInt(document.querySelector("#maxX").value);
+        //     curValue = curvalue + 100;
+        //     document.querySelector("#maxX").value = curValue;
 
-            drawCurrentQlog();
-        });
+        //     drawCurrentQlog();
+        // });
 
-        document.querySelector("#maxX").addEventListener('change', (event) => {
-            console.log("maxX change");
-            drawCurrentQlog();
-        });
-        document.querySelector("#minX").addEventListener('change', (event) => {
-            console.log("minX change");
-            drawCurrentQlog();
-        });
+        // document.querySelector("#maxX").addEventListener('change', (event) => {
+        //     console.log("maxX change");
+        //     drawCurrentQlog();
+        // });
+        // document.querySelector("#minX").addEventListener('change', (event) => {
+        //     console.log("minX change");
+        //     drawCurrentQlog();
+        // });
 
 
         document.querySelector("#upload_file").addEventListener("submit", onSubmitQlog);
@@ -448,7 +465,7 @@ This textarea will show the first 50k characters of the qlog result.
     The transportState parameters (rtt, cwnd, bytes_in_flight, etc.) are extracted and logged as separate qlog events. <br/>
     For this, we do some custom logic to filter out repeated values of these parameters (i.e., we only log if the value changed since it was logged previously).<br/>
     Finally, the congestionControlState metric is given a separate event if present. <br/><br/>
-    
+
     Currently using quic-trace proto schema from <a href="https://github.com/google/quic-trace/commit/3549681ff6370a0001c19b4b9c1bfa10355aa4a7">this commit</a>.<br/>
     This tool runs 100% locally in your browser (thanks to <a href="https://github.com/dcodeIO/ProtoBuf.js">protobuf.js</a>), no data is sent to our servers. <br/><br/>
 
@@ -459,6 +476,6 @@ This textarea will show the first 50k characters of the qlog result.
     <i>This tool was developed for and only tested in Google Chrome.</i><br/>
     <i>The JavaScript was meant to be easily readable and changeable, so no weird webpack build steps or typescript present</i>.<br/>
     Source code available at <a href="https://github.com/quiclog/quictrace2qlog">https://github.com/quiclog/quictrace2qlog</a>.<br/><br/><br/>
-    
+
 </body>
 </html>
