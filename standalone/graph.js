@@ -30,7 +30,7 @@ graphState = {
 	innerWidth: -1,
 	innerHeight: -1,
 
-	chartOverlay: null,
+	chartSvg: null,
 	canvas: null,
 	canvasContext: null,
 	mouseHandlerPanningSvg: null,
@@ -43,6 +43,8 @@ graphState = {
 	brush2d: null,
 	brush2dElement: null,
 	selectionBrush: null,
+	packetInformationDiv: null,
+	congestionGraphEnabled: true,
 
 	xScale: null,
 	yPacketScale: null, // Used for packet_sent, packet_acked and packet_lost
@@ -60,7 +62,13 @@ graphState = {
 	originalPacketRangeY: null, // [minY, maxY]
 	originalCongestionRangeY: null, // [minY, maxY]
 
+	drawScale: 1,
+
 	events: {
+		sent: null,
+		lost: null,
+	},
+	lut:{
 		sent: null,
 		acked: null,
 		lost: null,
@@ -79,6 +87,36 @@ graphState = {
 	}
 };
 
+recoveryGraphState = {
+	outerWidth: window.innerWidth * 0.8,
+	outerHeight: 300,
+	margins: {
+		top: 20,
+		bottom: 60,
+		left: 70,
+		right: 70,
+	},
+	innerWidth: -1,
+	innerHeight: -1,
+
+	graphSvg: null,
+	graphCanvas: null,
+	graphCanvasContext: null,
+
+	xAxis: null, // xScale is shared with main chart
+	gxAxis: null,
+
+	yScale: null,
+	yAxis: null,
+	gyAxis: null,
+	originalRangeY: null, // [minY, maxY]
+	rangeY: null,
+}
+
+function scalingFunction(x){
+	return (1 / (1 + Math.exp(-(x - 2) ))) + 1.2;
+}
+
 function redrawCanvas(minX, maxX, minPacketY, maxPacketY){
 	graphState.xScale = d3.scaleLinear()
 		.domain([minX, maxX])
@@ -90,61 +128,72 @@ function redrawCanvas(minX, maxX, minPacketY, maxPacketY){
 
 	graphState.gxAxis.call(graphState.xAxis.scale(graphState.xScale));
 	graphState.gyPacketAxis.call(graphState.yPacketAxis.scale(graphState.yPacketScale));
+	recoveryGraphState.gxAxis.call(recoveryGraphState.xAxis.scale(graphState.xScale));
+
+	graphState.drawScale = scalingFunction((graphState.originalRangeX[1] - graphState.originalRangeX[0]) / (maxX - minX));
 
 	graphState.canvasContext.clearRect(0, 0, graphState.innerWidth, graphState.innerHeight);
+	recoveryGraphState.graphCanvasContext.clearRect(0, 0, recoveryGraphState.innerWidth, recoveryGraphState.innerHeight);
 
-	for (const point of graphState.scatters["sent"]) {
-		drawPoint(graphState.xScale(point[0]), graphState.yPacketScale(point[1]), "#0000FF");
+	for (const event of graphState.scatters["sent"]) {
+		const height = graphState.yPacketScale(event.to) - graphState.yPacketScale(event.from);
+		drawRect(graphState.canvasContext, graphState.xScale(event.time), graphState.yPacketScale(event.to), (3 * graphState.drawScale), height, "#0000FF");
 	}
 
-	for (const point of graphState.scatters["acked"]) {
-		drawPoint(graphState.xScale(point[0]), graphState.yPacketScale(point[1]), "#6B8E23");
+	for (const event of graphState.scatters["acked"]) {
+		const height = graphState.yPacketScale(event.to) - graphState.yPacketScale(event.from);
+		drawRect(graphState.canvasContext, graphState.xScale(event.time), graphState.yPacketScale(event.to), (3 * graphState.drawScale), height, "#6B8E23");
 	}
 
-	for (const point of graphState.scatters["lost"]) {
-		drawPoint(graphState.xScale(point[0]), graphState.yPacketScale(point[1]), "#FF0000");
+	for (const event of graphState.scatters["lost"]) {
+		const height = graphState.yPacketScale(event.to) - graphState.yPacketScale(event.from);
+		drawRect(graphState.canvasContext, graphState.xScale(event.time), graphState.yPacketScale(event.to), (3 * graphState.drawScale), height, "#FF0000");
 	}
 
-	drawLines(graphState.congestionLines["bytes"].map((point) => {
-		return [ graphState.xScale(point[0]), graphState.yCongestionScale(point[1]) ];
-	}), "#808000", drawCircle);
+	if (graphState.congestionGraphEnabled) {
+		drawLines(graphState.canvasContext, graphState.congestionLines["bytes"].map((point) => {
+			return [ graphState.xScale(point[0]), graphState.yCongestionScale(point[1]) ];
+		}), "#808000", drawCircle);
 
-	drawLines(graphState.congestionLines["cwnd"].map((point) => {
-		return [ graphState.xScale(point[0]), graphState.yCongestionScale(point[1]) ];
-	}), "#8A2BE2", drawCross);
+		drawLines(graphState.canvasContext, graphState.congestionLines["cwnd"].map((point) => {
+			return [ graphState.xScale(point[0]), graphState.yCongestionScale(point[1]) ];
+		}), "#8A2BE2", drawCross);
+	}
+
+	drawLines(recoveryGraphState.graphCanvasContext, graphState.congestionLines["minRTT"].map((point) => {
+		return [ graphState.xScale(point[0]), recoveryGraphState.yScale(point[1]) ];
+	}), "#C96480");
+
+	drawLines(recoveryGraphState.graphCanvasContext, graphState.congestionLines["smoothedRTT"].map((point) => {
+		return [ graphState.xScale(point[0]), recoveryGraphState.yScale(point[1]) ];
+	}), "#8a554a");
+
+	drawLines(recoveryGraphState.graphCanvasContext, graphState.congestionLines["lastRTT"].map((point) => {
+		return [ graphState.xScale(point[0]), recoveryGraphState.yScale(point[1]) ];
+	}), "#ff9900");
+
+	graphState.rangeX = [minX, maxX];
+	graphState.packetRangeY = [minPacketY, maxPacketY];
 }
 
-function transformCanvas(transform){
-	const xScale = transform.rescaleX(graphState.xScale);
-	const yPacketScale = transform.rescaleY(graphState.yPacketScale);
-
-	graphState.gxAxis.call(graphState.xAxis.scale(xScale));
-	graphState.gyPacketAxis.call(graphState.yPacketAxis.scale(yPacketScale));
-
-	graphState.canvasContext.clearRect(0, 0, graphState.innerWidth, graphState.innerHeight);
-
-	for (const point of graphState.scatters["sent"]) {
-		drawPoint(xScale(point[0]), yPacketScale(point[1]), "#0000FF");
+function findXExtrema(){
+	let min = Infinity;
+	let max = 0;
+	for (const event of graphState.scatters["sent"]) {
+		min = min > event.time ? event.time : min;
+		max = max < event.time ? event.time : max;
 	}
 
-	for (const point of graphState.scatters["acked"]) {
-		drawPoint(xScale(point[0]), yPacketScale(point[1]), "#6B8E23");
+	for (const event of graphState.scatters["acked"]) {
+		min = min > event.time ? event.time : min;
+		max = max < event.time ? event.time : max;
 	}
 
-	for (const point of graphState.scatters["lost"]) {
-		drawPoint(xScale(point[0]), yPacketScale(point[1]), "#FF0000");
+	for (const event of graphState.scatters["lost"]) {
+		min = min > event.time ? event.time : min;
+		max = max < event.time ? event.time : max;
 	}
-
-	drawLines(graphState.congestionLines["bytes"].map((point) => {
-		return [ xScale(point[0]), graphState.yCongestionScale(point[1]) ];
-	}), "#808000", drawCircle);
-
-	drawLines(graphState.congestionLines["cwnd"].map((point) => {
-		return [ xScale(point[0]), graphState.yCongestionScale(point[1]) ];
-	}), "#8A2BE2", drawCross);
-
-	graphState.rangeX = [graphState.xScale.invert(0), graphState.xScale.invert(graphState.innerWidth)];
-	graphState.packetRangeY = [graphState.yPacketScale.invert(graphState.innerHeight), graphState.yPacketScale.invert(0)];
+	return [min, max];
 }
 
 // Finds the min and max Y value in the scatters of graphState
@@ -152,24 +201,24 @@ function transformCanvas(transform){
 function findYExtrema(minX, maxX){
 	let min = Infinity;
 	let max = 0;
-	for (const point of graphState.scatters["sent"]) {
-		if (point[0] >= minX && point[0] <= maxX) {
-			min = min > point[1] ? point[1] : min;
-			max = max < point[1] ? point[1] : max;
+	for (const event of graphState.scatters["sent"]) {
+		if (event.time >= minX && event.time <= maxX) {
+			min = min > event.to ? event.to : min;
+			max = max < event.to ? event.to : max;
 		}
 	}
 
-	for (const point of graphState.scatters["acked"]) {
-		if (point[0] >= minX && point[0] <= maxX) {
-			min = min > point[1] ? point[1] : min;
-			max = max < point[1] ? point[1] : max;
+	for (const event of graphState.scatters["acked"]) {
+		if (event.time >= minX && event.time <= maxX) {
+			min = min > event.to ? event.to : min;
+			max = max < event.to ? event.to : max;
 		}
 	}
 
-	for (const point of graphState.scatters["lost"]) {
-		if (point[0] >= minX && point[0] <= maxX) {
-			min = min > point[1] ? point[1] : min;
-			max = max < point[1] ? point[1] : max;
+	for (const event of graphState.scatters["lost"]) {
+		if (event.time >= minX && event.time <= maxX) {
+			min = min > event.to ? event.to : min;
+			max = max < event.to ? event.to : max;
 		}
 	}
 	return [min, max];
@@ -189,74 +238,104 @@ function findCongestionYExtrema(){
 	return [min, max];
 }
 
-function drawPoint(x, y, color){
-	graphState.canvasContext.beginPath();
-	graphState.canvasContext.fillStyle = color;
-	graphState.canvasContext.rect(x - 1.5, y + 1.5, 3, 3);
-	graphState.canvasContext.fill();
+function findRecoveryYExtrema(){
+	let min = Infinity;
+	let max = 0;
+	for (const point of graphState.congestionLines["minRTT"]){
+		min = min > point[1] ? point[1] : min;
+		max = max < point[1] ? point[1] : max;
+	}
+	for (const point of graphState.congestionLines["smoothedRTT"]){
+		min = min > point[1] ? point[1] : min;
+		max = max < point[1] ? point[1] : max;
+	}
+	for (const point of graphState.congestionLines["lastRTT"]){
+		min = min > point[1] ? point[1] : min;
+		max = max < point[1] ? point[1] : max;
+	}
+	return [min, max];
 }
 
-function drawLines(pointList, color, tickDrawFunction){
+function findAckedPackets(ackFrom, ackTo){
+	const packets = [];
+
+	for (const packet of graphState.lut["sent"]){
+		if (packet.from >= ackFrom && packet.to <= ackTo) {
+			packets.push(packet);
+		}
+	}
+
+	return packets;
+}
+
+function drawPoint(canvasContext, x, y, color){
+	const radius = (3 * graphState.drawScale) / 2;
+	canvasContext.beginPath();
+	canvasContext.fillStyle = color;
+	canvasContext.rect(x - radius, y + radius, radius * 2, radius * 2);
+	canvasContext.fill();
+}
+
+// const height = height > 1 ? (height * graphState.drawScale) : (1 * graphState.drawScale); // Bound to a minimum
+function drawRect(canvasContext, x, y, width, height, color){
+	canvasContext.beginPath();
+	canvasContext.fillStyle = color;
+	canvasContext.rect(x, y, width * graphState.drawScale, -height * graphState.drawScale);
+	canvasContext.fill();
+}
+
+function drawLines(canvasContext, pointList, color, tickDrawFunction){
+	canvasContext.lineWidth = 1 * graphState.drawScale;
 	if (pointList.length > 0) {
-		graphState.canvasContext.beginPath();
-		graphState.canvasContext.strokeStyle = color;
+		canvasContext.beginPath();
+		canvasContext.strokeStyle = color;
 		const startX = pointList[0][0];
 		const startY = pointList[0][1];
-		graphState.canvasContext.moveTo(startX, startY);
+		canvasContext.moveTo(startX, startY);
 		for (let i = 1; i < pointList.length; ++i) {
 			const pointX = pointList[i][0];
 			const pointY = pointList[i][1];
-			graphState.canvasContext.lineTo(pointX, pointY);
+			canvasContext.lineTo(pointX, pointY);
 		}
-		graphState.canvasContext.stroke();
+		canvasContext.stroke();
 		for (let i = 1; i < pointList.length; ++i) {
 			const pointX = pointList[i][0];
 			const pointY = pointList[i][1];
 			if (tickDrawFunction) {
-				tickDrawFunction(pointX, pointY, color);
+				tickDrawFunction(canvasContext, pointX, pointY, color);
 			}
 		}
 	}
 }
 
-function drawCross(centerX, centerY, color){
+function drawCross(canvasContext, centerX, centerY, color){
 	const radius = 2;
-	graphState.canvasContext.strokeStyle = color;
+	canvasContext.strokeStyle = color;
 	// Top left to bottom right
-	graphState.canvasContext.beginPath();
-	graphState.canvasContext.moveTo(centerX - radius, centerY - radius);
-	graphState.canvasContext.lineTo(centerX + radius, centerY + radius);
-	graphState.canvasContext.stroke();
+	canvasContext.beginPath();
+	canvasContext.moveTo(centerX - radius, centerY - radius);
+	canvasContext.lineTo(centerX + radius, centerY + radius);
+	canvasContext.stroke();
 
 	// Top right to bottom left
-	graphState.canvasContext.beginPath();
-	graphState.canvasContext.moveTo(centerX + radius, centerY - radius);
-	graphState.canvasContext.lineTo(centerX - radius, centerY + radius);
-	graphState.canvasContext.stroke();
+	canvasContext.beginPath();
+	canvasContext.moveTo(centerX + radius, centerY - radius);
+	canvasContext.lineTo(centerX - radius, centerY + radius);
+	canvasContext.stroke();
 }
 
-function drawCircle(centerX, centerY, color){
+function drawCircle(canvasContext, centerX, centerY, color){
 	const radius = 2;
-	graphState.canvasContext.fillStyle = color;
+	canvasContext.fillStyle = color;
 
-	graphState.canvasContext.beginPath();
-	graphState.canvasContext.arc(centerX, centerY, radius, 0, 360);
-	graphState.canvasContext.fill();
+	canvasContext.beginPath();
+	canvasContext.arc(centerX, centerY, radius, 0, 360);
+	canvasContext.fill();
 }
 
 function resetZoom(){
 	graphState.rangeX = graphState.originalRangeX;
 	graphState.packetRangeY = graphState.originalPacketRangeY;
-
-	// graphState.xScale = d3.scaleLinear()
-	// 	.domain(graphState.rangeX)
-	// 	.range([0, graphState.innerWidth])
-	// 	.nice();
-
-	// graphState.yPacketScale = d3.scaleLinear()
-	// 	.domain([graphState.packetRangeY[0], graphState.packetRangeY[1]])
-	// 	.range([graphState.innerHeight, 0])
-	// 	.nice();
 
 	redrawCanvas(graphState.rangeX[0], graphState.rangeX[1], graphState.packetRangeY[0], graphState.packetRangeY[1]);
 }
@@ -275,7 +354,7 @@ function onBrushXEnd(){
 	redrawCanvas(minX, maxX, minY, maxY);
 
 	graphState.mouseHandlerBrushXSvg.call(graphState.brushX, null); // Clear brush highlight
-	graphState.rangeX = [minX, maxX];
+	usePanning(); // Switch back to panning mode
 }
 
 function onBrush2dEnd(){
@@ -294,8 +373,7 @@ function onBrush2dEnd(){
 	redrawCanvas(minX, maxX, minY, maxY);
 
 	graphState.mouseHandlerBrush2dSvg.call(graphState.brush2d, null); // Clear brush highlight
-	graphState.rangeX = [minX, maxX];
-	graphState.packetRangeY = [minY, maxY];
+	usePanning(); // Switch back to panning mode
 }
 
 function onSelection(){
@@ -325,38 +403,98 @@ function onPickerClick(){
 	const pixelData = graphState.canvasContext.getImageData(svgClickCoords[0], svgClickCoords[1], 1, 1).data;
 	const pixelColor = [ pixelData[0], pixelData[1], pixelData[2] ];
 
-	// if (pixelColor[0] === 0 && pixelColor[1] === 0 && pixelColor[2] === 255 ) {
-	// 	// sent
-	// 	for (const packet of graphState.events.sent) {
-	// 		if (packet.timestamp >= graphCoords[0] - 1.5 && packet.timestamp <= graphCoords[0] + 1.5) {
-	// 			console.log("Clicked on: ", packet);
-	// 		}
-	// 	}
-	// } else if (pixelColor[0] === 107 && pixelColor[1] === 142 && pixelColor[2] === 35 ) {
-	// 	// acked
-	// 	// for (const packet of graphState.events.acked) {
-	// 	// 	if (packet.timestamp >= graphCoords[0] - 1.5 && packet.timestamp <= graphCoords[0] + 1.5) {
-	// 	// 		console.log("Clicked on: ", packet);
-	// 	// 	}
-	// 	// }
-	// } else if (pixelColor[0] === 255 && pixelColor[1] === 0 && pixelColor[2] === 0 ) {
-	// 	// lost
-	// 	for (const packet of graphState.events.lost) {
-	// 		if (packet.timestamp >= graphCoords[0] - 1.5 && packet.timestamp <= graphCoords[0] + 1.5) {
-	// 			console.log("Clicked on: ", packet);
-	// 		}
-	// 	}
-	// } else {
-	// 	// No event found
-	// }
-
 	graphState.eventBus.dispatchEvent(new CustomEvent('packetPickEvent', {
 		detail: {
 			x: graphCoords[0],
 			y: graphCoords[1],
 			pixelColor: pixelColor,
 		},
-	}))
+	}));
+}
+
+function onHover(){
+	// Clear all ackarrows
+	graphState.chartSvg.selectAll(".ackArrow").remove();
+
+	if (d3.event.buttons !== 0) {
+		graphState.packetInformationDiv.style("display", "none");
+		return;
+	}
+
+	const svgHoverCoords = d3.mouse(this);
+	const graphCoords = [graphState.xScale.invert(svgHoverCoords[0]), graphState.yPacketScale.invert(svgHoverCoords[1])];
+
+	const pixelData = graphState.canvasContext.getImageData(svgHoverCoords[0], svgHoverCoords[1], 1, 1).data;
+	const pixelColor = [ pixelData[0], pixelData[1], pixelData[2] ];
+
+	if (pixelColor[0] === 0 && pixelColor[1] === 0 && pixelColor[2] === 255 ) {
+		// sent
+		for (const packet of graphState.events.sent) {
+			if (packet.timestamp >= graphCoords[0] - 1.5 && packet.timestamp <= graphCoords[0] + 1.5) {
+				graphState.packetInformationDiv.style("display", "block");
+				graphState.packetInformationDiv.style("left", (svgHoverCoords[0] + graphState.margins.left - 50 + 10) + "px");
+				graphState.packetInformationDiv.style("top", (svgHoverCoords[1] + graphState.margins.top + 10) + "px");
+				graphState.packetInformationDiv.select("#timestamp").text("Timestamp: " + packet.timestamp);
+				graphState.packetInformationDiv.select("#packetNr").text("PacketNr: " + packet.details.header.packet_number);
+				graphState.packetInformationDiv.select("#packetSize").text("PacketSize: " + packet.details.header.packet_size);
+				return;
+			}
+		}
+	} else if (pixelColor[0] === 107 && pixelColor[1] === 142 && pixelColor[2] === 35 ) {
+		// acked
+		for (const packet of graphState.lut["acked"]) {
+			if (packet.time >= graphCoords[0] - 1.5 && packet.time <= graphCoords[0] + 1.5 && packet.from <= graphCoords[1] && packet.to >= graphCoords[1]) {
+				graphState.packetInformationDiv.style("display", "block");
+				graphState.packetInformationDiv.style("left", (svgHoverCoords[0] + graphState.margins.left - 50 + 10) + "px");
+				graphState.packetInformationDiv.style("top", (svgHoverCoords[1] + graphState.margins.top + 10) + "px");
+				graphState.packetInformationDiv.select("#timestamp").text("Timestamp: " + packet.time);
+				graphState.packetInformationDiv.select("#ackedFrom").text("Acked from: " + packet.from);
+				graphState.packetInformationDiv.select("#ackedTo").text("Acked to: " + packet.to);
+
+				const correspondingPackets = findAckedPackets(packet.from, packet.to);
+
+				for (const correspondingPacket of correspondingPackets) {
+					const packetX = graphState.xScale(correspondingPacket.time);
+					const yCenter = ((correspondingPacket.to - correspondingPacket.from) / 2) + correspondingPacket.from;
+					const packetY = graphState.yPacketScale(yCenter);
+
+					graphState.chartSvg
+						.append("line")
+						.attr("class", "ackArrow")
+						.attr("x1", svgHoverCoords[0])
+						.attr("x2", packetX > 0 ? packetX : 0)
+						.attr("y1", packetY)
+						.attr("y2", packetY)
+						.attr("stroke-width", "2px")
+						.attr("stroke", "#8d8369");
+				}
+
+				return;
+			}
+		}
+	} else if (pixelColor[0] === 255 && pixelColor[1] === 0 && pixelColor[2] === 0 ) {
+		// lost
+		for (const packet of graphState.events.lost) {
+			if (packet.timestamp >= graphCoords[0] - 1.5 && packet.timestamp <= graphCoords[0] + 1.5) {
+				graphState.packetInformationDiv.style("display", "block");
+				graphState.packetInformationDiv.style("left", (svgHoverCoords[0] + graphState.margins.left - 50 + 10) + "px");
+				graphState.packetInformationDiv.style("top", (svgHoverCoords[1] + graphState.margins.top + 10) + "px");
+				graphState.packetInformationDiv.select("#timestamp").text("Timestamp: " + packet.timestamp);
+				graphState.packetInformationDiv.select("#packetNr").text("PacketNr: " + packet.details.header.packet_number);
+				graphState.packetInformationDiv.select("#packetSize").text("PacketSize: " + packet.details.header.packet_size);
+				return;
+			}
+		}
+	} else {
+		// No event found
+		graphState.packetInformationDiv.style("display", "none");
+		graphState.packetInformationDiv.select("#timestamp").text("");
+		graphState.packetInformationDiv.select("#packetNr").text("");
+		graphState.packetInformationDiv.select("#packetSize").text("");
+		graphState.packetInformationDiv.select("#ackedFrom").text("");
+		graphState.packetInformationDiv.select("#ackedTo").text("");
+		graphState.chartSvg.selectAll(".ackArrow").remove();
+	}
 }
 
 function onZoom(){
@@ -384,9 +522,6 @@ function onZoom(){
 	const [newTopY, newBottomY] = findYExtrema(newLeftX, newRightX);
 
 	redrawCanvas(newLeftX, newRightX, newTopY, newBottomY);
-
-	graphState.rangeX = [newLeftX, newRightX];
-	graphState.packetRangeY = [newTopY, newBottomY];
 }
 
 function panCanvas(deltaX, deltaY){
@@ -410,10 +545,6 @@ function panCanvas(deltaX, deltaY){
 	const newBottomY =  graphState.packetRangeY[1] + deltaY;
 
 	redrawCanvas(newLeftX, newRightX, newTopY, newBottomY);
-
-	// Update current ranges
-	graphState.rangeX = [newLeftX, newRightX];
-	graphState.packetRangeY = [newTopY, newBottomY];
 }
 
 let previousX = null;
@@ -484,6 +615,12 @@ function usePicker(){
 	graphState.mouseHandlerPickSvg.style('z-index', 1);
 }
 
+function toggleCongestionGraph(){
+	graphState.congestionGraphEnabled = graphState.congestionGraphEnabled ? false : true;
+
+	redrawCanvas(graphState.rangeX[0], graphState.rangeX[1], graphState.packetRangeY[0], graphState.packetRangeY[1]);
+}
+
 function drawGraphd3( qlog, settings ){
 	console.log("Drawing graph with d3...", qlog, settings);
 
@@ -491,7 +628,6 @@ function drawGraphd3( qlog, settings ){
 	graphState.eventBus.addEventListener('packetSelectionEvent', (e) => {
 		console.log("event: ", e.detail);
 	});
-
 	graphState.eventBus.addEventListener('packetPickEvent', (e) => {
 		console.log("event: ", e.detail);
 	});
@@ -499,12 +635,18 @@ function drawGraphd3( qlog, settings ){
 	graphState.qlog = qlog;
 
 	graphState.innerWidth = graphState.outerWidth - graphState.margins.left - graphState.margins.right;
-	graphState.innerHeight =graphState.outerHeight - graphState.margins.top - graphState.margins.bottom,
+	graphState.innerHeight = graphState.outerHeight - graphState.margins.top - graphState.margins.bottom,
+
+	recoveryGraphState.innerWidth = recoveryGraphState.outerWidth - recoveryGraphState.margins.left - recoveryGraphState.margins.right;
+	recoveryGraphState.innerHeight = recoveryGraphState.outerHeight - recoveryGraphState.margins.top - recoveryGraphState.margins.bottom;
 
 	// Give a set height to the container so its children can fit inside
 	d3.select("#graphContainer").style("height", graphState.outerHeight + "px");
+	d3.select("#recoveryGraphContainer").style("height", recoveryGraphState.outerHeight + "px");
 
-	graphState.chartOverlay = d3.select("#graphContainer")
+	graphState .packetInformationDiv = d3.select("#packetInfo");
+
+	graphState.chartSvg = d3.select("#graphContainer")
 		.append('svg:svg')
 		.attr('width', graphState.outerWidth)
 		.attr('height', graphState.outerHeight)
@@ -565,38 +707,54 @@ function drawGraphd3( qlog, settings ){
 		.style('z-index', 0) // Disabled by default
 		.style('position', "absolute");
 
+	recoveryGraphState.graphSvg = d3.select("#recoveryGraphContainer")
+		.append('svg:svg')
+		.attr('width', recoveryGraphState.outerWidth)
+		.attr('height', recoveryGraphState.outerHeight)
+		.style('position', "absolute")
+		.append('g')
+		.attr('transform', 'translate(' + recoveryGraphState.margins.left + ', ' + recoveryGraphState.margins.top + ')');
+
+	recoveryGraphState.graphCanvas = d3.select("#recoveryGraphContainer")
+		.append('canvas')
+		.attr('width', recoveryGraphState.innerWidth)
+		.attr('height', recoveryGraphState.innerHeight)
+		.style('margin-left', recoveryGraphState.margins.left + "px")
+		.style('margin-top', recoveryGraphState.margins.top + "px")
+		.style('position', "absolute");
+
 	graphState.canvasContext = graphState.canvas.node().getContext('2d');
+	recoveryGraphState.graphCanvasContext = recoveryGraphState.graphCanvas.node().getContext('2d');
 
 	// -----------------------------------
 
-	const [minX, maxX, minY, maxY, packetsSentScatterData, packetsAckedScatterData, packetsLostScatterData, bytesUpdates, cwndupdates, minRTTupdates, smoothedRTTupdates, lastRTTupdates] = parseData(qlog, settings);
+	// Parses qlog and fills graphState.events, graphState.scatters and graphState.lut
+	parseData(qlog, settings);
 
-	graphState.scatters['sent'] = packetsSentScatterData;
-	graphState.scatters['acked'] = packetsAckedScatterData;
-	graphState.scatters['lost'] = packetsLostScatterData;
-
-	graphState.congestionLines['bytes'] = bytesUpdates;
-	graphState.congestionLines['cwnd'] = cwndupdates;
-	graphState.congestionLines['minRTT'] = minRTTupdates;
-	graphState.congestionLines['smoothedRTT'] = smoothedRTTupdates;
-	graphState.congestionLines['lastRTT'] = lastRTTupdates;
-
+	const [globalXMin, globalXMax] = findXExtrema();
+	const [localXMin, localXMax] = [settings.minX && settings.minX > globalXMin ? settings.minX : globalXMin, settings.maxX && settings.maxX < globalXMax ? settings.maxX : globalXMax];
+	const [localMinPacketY, localMaxPacketY] = findYExtrema(settings.minX, settings.maxX);
+	const [globalMinPacketY, globalMaxPacketY] = findYExtrema(globalXMin, globalXMax);
 	let [minCongestionY, maxCongestionY] = findCongestionYExtrema();
 	maxCongestionY *= 3; // Make the congestion graph take up only 1/3 of the vertical screen space
+	const [minRecoveryY, maxRecoveryY] = findRecoveryYExtrema();
 
-	// Init scales when json has been converted to
 	graphState.xScale = d3.scaleLinear()
-		.domain([minX, maxX])
-		.range([0, graphState.innerWidth])
+		.domain([localXMin, localXMax])
+		.range([0, graphState.innerWidth]);
 
 	graphState.yPacketScale = d3.scaleLinear()
-		.domain([minY, maxY])
-		.range([graphState.innerHeight, 0])
+		.domain([localMinPacketY, localMaxPacketY])
+		.range([graphState.innerHeight, 0]);
 
 	graphState.yCongestionScale = d3.scaleLinear()
 		.domain([0, maxCongestionY])
 		.range([graphState.innerHeight, 0])
-		.nice()
+		.nice();
+
+	recoveryGraphState.yScale = d3.scaleLinear()
+		.domain([minRecoveryY, maxRecoveryY])
+		.range([recoveryGraphState.innerHeight, 0]);
 
 	graphState.xAxis = d3.axisBottom(graphState.xScale)
 		.tickSize(-graphState.innerHeight)
@@ -640,64 +798,86 @@ function drawGraphd3( qlog, settings ){
 		.tickSize(graphState.innerWidth)
 		.scale(graphState.yCongestionScale)
 
-	graphState.gxAxis = graphState.chartOverlay.append('g')
+	recoveryGraphState.xAxis = d3.axisBottom(graphState.xScale)
+		.tickSize(-recoveryGraphState.innerHeight)
+		.scale(graphState.xScale);
+
+	recoveryGraphState.yAxis = d3.axisLeft(recoveryGraphState.yScale)
+		.tickSize(-recoveryGraphState.innerWidth)
+		.scale(recoveryGraphState.yScale);
+
+	graphState.gxAxis = graphState.chartSvg.append('g')
 		.attr('transform', 'translate(0, ' + graphState.innerHeight + ')')
 		.attr("class", "grid")
 		.call(graphState.xAxis);
 
-	graphState.gyPacketAxis = graphState.chartOverlay.append('g')
+	graphState.gyPacketAxis = graphState.chartSvg.append('g')
 		.attr("class", "grid")
 		.call(graphState.yPacketAxis);
 
-	graphState.gyCongestionAxis = graphState.chartOverlay.append('g')
+	graphState.gyCongestionAxis = graphState.chartSvg.append('g')
 		.attr("class", "nogrid")
 		.call(graphState.yCongestionAxis);
 
+	recoveryGraphState.gxAxis = recoveryGraphState.graphSvg.append('g')
+		.attr('transform', 'translate(0, ' + recoveryGraphState.innerHeight + ')')
+		.attr("class", "grid")
+		.call(recoveryGraphState.xAxis);
+
+	recoveryGraphState.gyAxis = recoveryGraphState.graphSvg.append('g')
+		.attr("class", "grid")
+		.call(recoveryGraphState.yAxis);
+
 	// Packet axis
-	graphState.chartOverlay.append('text')
+	graphState.chartSvg.append('text')
 		.attr('x', '-' + (graphState.innerHeight / 2))
 		.attr('dy', '-3.5em')
 		.attr('transform', 'rotate(-90)')
 		.text('Data sent (bytes)');
 
 	// X axis
-	graphState.chartOverlay.append('text')
+	graphState.chartSvg.append('text')
 		.attr('x', '' + (graphState.innerWidth / 2))
 		.attr('y', '' + (graphState.innerHeight + 40))
 		.text('Time (ms)');
 
 	// Congestion axis
-	graphState.chartOverlay.append('text')
+	graphState.chartSvg.append('text')
 		.attr('transform', 'translate(' + (graphState.innerWidth + graphState.margins.right) + ', ' + graphState.innerHeight / 2 + '), rotate(-90)')
 		.text('Congestion info (bytes)');
 
-	graphState.originalRangeX = [graphState.xScale.domain()[0], graphState.xScale.domain()[1]];
-	graphState.rangeX = graphState.originalRangeX;
-	graphState.originalPacketRangeY = [graphState.yPacketScale.domain()[0], graphState.yPacketScale.domain()[1]];
-	graphState.packetRangeY = graphState.originalPacketRangeY;
+	// Recovery x axis
+	recoveryGraphState.graphSvg.append('text')
+		.attr('x', '' + (recoveryGraphState.innerWidth / 2))
+		.attr('y', '' + (recoveryGraphState.innerHeight + 40))
+		.text('Time (ms)');
+
+	// Recovery y axis
+	recoveryGraphState.graphSvg.append('text')
+		.attr('x', '-' + (recoveryGraphState.innerHeight / 2))
+		.attr('dy', '-3.5em')
+		.attr('transform', 'rotate(-90)')
+		.text('RTT (ms)');
+
+	graphState.originalRangeX = [globalXMin, globalXMax];
+	graphState.rangeX = [localXMin, localXMax];
+	graphState.originalPacketRangeY = [globalMinPacketY, globalMaxPacketY];
+	graphState.packetRangeY = [localMinPacketY, localMaxPacketY];
 	graphState.originalCongestionRangeY = [minCongestionY, maxCongestionY];
 	graphState.congestionRangeY = graphState.originalCongestionRangeY;
+	recoveryGraphState.originalRangeY = [minRecoveryY, maxRecoveryY];
+	recoveryGraphState.rangeY = recoveryGraphState.originalRangeY;
 
-	redrawCanvas(graphState.originalRangeX[0], graphState.originalRangeX[1], graphState.originalPacketRangeY[0], graphState.originalPacketRangeY[1]);
-
-	// const panFunction = d3.zoom().on('zoom', () => {
-	// 	const transform = d3.event.transform;
-	// 	const canvasDeltaX = transform.x;
-	// 	const canvasDeltaY = transform.y;
-
-	// 	const graphDeltaX = graphState.xScale.invert(canvasDeltaX) - graphState.xScale.invert(0);
-	// 	const graphDeltaY = graphState.yPacketScale.invert(0) - graphState.yPacketScale.invert(canvasDeltaY);
-
-	// 	onPan(graphDeltaX<)
-	// 	// graphState.canvasContext.save();
-	// 	// transformCanvas(transform);
-	// 	// graphState.canvasContext.restore();
-	// });
+	redrawCanvas(graphState.rangeX[0], graphState.rangeX[1], graphState.packetRangeY[0], graphState.packetRangeY[1]);
 
 	graphState.mouseHandlerPanningSvg.on("wheel", onZoom)
-		.on("mousemove", onPan);
+		.on("click", onPickerClick)
+		.on("mousemove.pan", onPan)
+		.on("mousemove.hover", onHover);
 
-	graphState.mouseHandlerPickSvg.on("wheel", onZoom);
+	graphState.mouseHandlerPickSvg.on("wheel", onZoom)
+		.on("click", onPickerClick)
+		.on("mousemove", onHover);
 
 	graphState.brushX = d3.brushX()
 		.extent([[0, 0], [graphState.innerWidth, graphState.innerHeight]])
@@ -708,7 +888,7 @@ function drawGraphd3( qlog, settings ){
 		.attr("class", "brush")
 		.call(graphState.brushX)
 		.on("wheel", onZoom)
-		.on("mousemove.zoom", null);
+		.on("mousemove", onHover);
 
 	graphState.brush2d = d3.brush()
 		.extent([[0, 0], [graphState.innerWidth, graphState.innerHeight]])
@@ -719,7 +899,7 @@ function drawGraphd3( qlog, settings ){
 		.attr("class", "brush")
 		.call(graphState.brush2d)
 		.on("wheel", onZoom)
-		.on("mousemove.zoom", null);
+		.on("mousemove", onHover);
 
 	graphState.selectionBrush = d3.brush()
 		.extent([[0, 0], [graphState.innerWidth, graphState.innerHeight]])
@@ -730,11 +910,10 @@ function drawGraphd3( qlog, settings ){
 		.attr("class", "brush")
 		.call(graphState.selectionBrush)
 		.on("wheel", onZoom)
-		.on("mousemove.zoom", null);
-
-	graphState.mouseHandlerPickSvg.on("click", onPickerClick);
+		.on("mousemove", onHover);
 
 	d3.select("#graphContainer").style("display", "block");
+	d3.select("#recoveryGraphContainer").style("display", "block");
 }
 
 // Returns [minX, maxX, minY, maxY, packetsSentScatterData, packetsAckedScatterData, packetsLostScatterData, bytesUpdates, cwndupdates, minRTTupdates, smoothedRTTupdates, lastRTTupdates]
@@ -744,8 +923,8 @@ function parseData(qlog, settings){
 	let multistreamDictionary = new Map();
 
 	let xCap = 99999999999;
-	let maxTimestamp = settings.maxX;
-	let minTimestamp = settings.minX;
+	let maxTimestamp = xCap;
+	let minTimestamp = 0;
 
 	let smallMaxX = 0;
 	let smallMaxY = 0;
@@ -930,7 +1109,7 @@ function parseData(qlog, settings){
 		packetsSentScatterData.push( [x, y1 + ((y2 - y1) / 2)] );
 	}
 
-	graphState.scatters["sent"] = packetsSentScatterData;
+	graphState.scatters["sent"] = packetsSentSizeLUT;
 
 	let packetsAckedScatterData = [];
 	let packetsAckedSizeLUT = []; // need to get tickmarks of the correct size drawn
@@ -955,7 +1134,7 @@ function parseData(qlog, settings){
 		packetsAckedScatterData.push( [x, y1 + ((y2 - y1) / 2)] );
 	}
 
-	graphState.scatters["acked"] = packetsAckedScatterData;
+	graphState.scatters["acked"] = packetsAckedSizeLUT;
 
 	let packetsLostScatterData = [];
 	let packetsLostSizeLUT = []; // need to get tickmarks of the correct size drawn
@@ -980,7 +1159,7 @@ function parseData(qlog, settings){
 		packetsLostScatterData.push( [x, y1 + ((y2 - y1) / 2)] );
 	}
 
-	graphState.scatters["lost"] = packetsLostScatterData;
+	graphState.scatters["lost"] = packetsLostSizeLUT;
 
 	smallMaxX = Math.min( smallMaxX, xCap );
 
@@ -1069,7 +1248,17 @@ function parseData(qlog, settings){
 	graphState.events.sent = packetsSent;
 	graphState.events.lost = packetsLost;
 
-	return [settings.minX, smallMaxX, 0, smallMaxY, packetsSentScatterData, packetsAckedScatterData, packetsLostScatterData, bytesUpdates, cwndupdates, minRTTupdates, smoothedRTTupdates, lastRTTupdates];
+	graphState.lut.sent = packetsSentSizeLUT;
+	graphState.lut.acked = packetsAckedSizeLUT;
+	graphState.lut.lost = packetsLostSizeLUT;
+
+	graphState.congestionLines['bytes'] = bytesUpdates;
+	graphState.congestionLines['cwnd'] = cwndupdates;
+	graphState.congestionLines['minRTT'] = minRTTupdates;
+	graphState.congestionLines['smoothedRTT'] = smoothedRTTupdates;
+	graphState.congestionLines['lastRTT'] = lastRTTupdates;
+
+	return [settings.minX, smallMaxX, 0, smallMaxY];
 }
 
 // we will add the qlog events to a separate dictionary for easy filtering and grouping of events

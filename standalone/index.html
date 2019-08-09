@@ -97,12 +97,20 @@
 
 <div id="graphContainer" style="display: none">
     <button type="button" onclick="resetZoom()">Reset zoom</button>
-    <button type="button" onclick="useBrushX()">Use horizontal brush</button>
-    <button type="button" onclick="useBrush2d()">Use 2d brush</button>
-    <button type="button" onclick="usePanning()">Use panning controls</button>
-    <button type="button" onclick="useSelection()">Use selection</button>
-    <button type="button" onclick="usePicker()">Use picker</button>
+    <button type="button" onclick="useBrushX()">Select timerange</button>
+    <button type="button" onclick="useBrush2d()">Select area</button>
+    <!-- <button type="button" onclick="usePanning()">Use panning controls</button> -->
+    <!-- <button type="button" onclick="useSelection()">Use selection</button> -->
+    <!-- <button type="button" onclick="usePicker()">Use picker</button> -->
+    <button type="button" onclick="toggleCongestionGraph()">Toggle congestion graph</button>
     <div style="position: relative; margin-left: 50px;">
+        <div id="packetInfo" style="position: absolute; display: none; z-index: 100; padding: 5px; border: 1px solid black; background-color: white;">
+            <p id="timestamp"></p>
+            <p id="packetNr"></p>
+            <p id="packetSize"></p>
+            <p id="ackedFrom"></p>
+            <p id="ackedTo"></p>
+        </div>
         <!--
         <div style="float: left;">Min X (ms): <input id="minX" value="0" /><button id="minX_incr">+</button><button id="minX_decr">-</button></div>
         <div style="float: right; margin-right: 20%;">Max X (ms): <input id="maxX" value="50000" /><button id="maxX_incr">+</button><button id="maxX_decr">-</button></div>
@@ -138,7 +146,6 @@
 
         </div>
     </div>
-
     <!--
     <div style="position: relative; margin-left: 50px;">
         <canvas id="recoveryPlot2" width="200" height="200">[No canvas support]</canvas>
@@ -163,6 +170,9 @@
         <div class="axisTitle" id="titleBottom" style="width: 80%; text-align: center;">time (ms)</div>
     </div>
     -->
+</div>
+<div id="recoveryGraphContainer" style="display: none;">
+
 </div>
 <br/><br/>
 <div id="graphExplanation" style="border: 1px solid black; padding: 5px; text-align: center;">
