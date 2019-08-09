@@ -285,6 +285,11 @@ This textarea will show the first 50k characters of the qlog result.
 
                     for( let trace of currentQlog.traces ){
 
+                        if( trace.event_fields.count !== 5 ){
+                            document.getElementById("statistics").innerHTML = "Input qlog did not have 5 event_fields (time, CATEGORY, EVENT_TYPE, TRIGGER, DATA), which is needed for calculating statistics (because this is very dirty code). Everything else should still work.";
+                            return;
+                        }
+
                         statistics.eventCount += trace.events.length;
 
                         for( let qlogEvent of trace.events ){

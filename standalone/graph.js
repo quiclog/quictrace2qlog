@@ -39,13 +39,29 @@ function drawGraph(qlog, settings){
 		let multistreamDictionary = new Map();
 
 		// we will add the qlog events to a separate dictionary for easy filtering and grouping of events
-		let addToDictionary = function( fieldIndices, timeMultiplier, subtractTime, dictionary, evt ){
+		let addToDictionary = function( fieldIndices, timeMultiplier, subtractTime, dictionary, evt, common_fields ){
 
 			// we want : dictionary[category][event] = { timestamp, trigger, details }
 			let category = evt[ fieldIndices.category ];
 			let evtname  = evt[ fieldIndices.event ];
 			let trigger  = evt[ fieldIndices.trigger ];
 			let data 	 = evt[ fieldIndices.data ];
+
+			if( category === undefined ) {
+				if( common_fields ){
+					if( common_fields.CATEGORY !== undefined ){
+						category = common_fields.CATEGORY;
+					}
+					if( common_fields.category !== undefined ){
+						category = common_fields.category;
+					}
+				}
+			}
+
+			if( category === undefined ) {
+				console.error("Event had no category, is required. Set this in event_fields and log with each event or set once in common_fields to re-use for each event.");
+				return;
+			}
 
 			if( !dictionary.has(category) )
 				dictionary.set( category, new Map() );
@@ -93,7 +109,7 @@ function drawGraph(qlog, settings){
 
 
 		for( let evt of logSet.traces[0].events ){
-			addToDictionary( fieldIndices, timeMultiplier, subtractTime * timeMultiplier, multistreamDictionary, evt );
+			addToDictionary( fieldIndices, timeMultiplier, subtractTime * timeMultiplier, multistreamDictionary, evt, logSet.traces[0].common_fields );
 		}
 
 
@@ -119,22 +135,31 @@ function drawGraph(qlog, settings){
 				packetsSent = multistreamDictionary.get(getPropertyNameForVersion("TRANSPORT", logSet["qlog_version"])).get(getPropertyNameForVersion("PACKET_SENT", logSet["qlog_version"]));
 			}
 
+			let missingPacketSizeCount = 0;
 			let totalSentByteCount = 0;
 			for( let packet of packetsSent ){
 
 				let data = packet.details;
 
+				let packetSize = 0;
 				if( !data.header.packet_size || data.header.packet_size == 0 ){
-					console.error("Packet had invalid size! not counting!", packet);
-					continue;
+					console.error("Packet had invalid size! defaulting to 1500 bytes!", packet);
+					packetSize = 1500;
+					++missingPacketSizeCount;
 				}
+				else
+					packetSize = data.header.packet_size
 
 				let packetOffsetStart = totalSentByteCount + 1;
-				totalSentByteCount += data.header.packet_size;
+				totalSentByteCount += packetSize;
 
-				commonPacketSize = data.header.packet_size;
+				commonPacketSize = packetSize;
 
 				packetSentList[ parseInt( data.header.packet_number ) ] = { time: packet.timestamp, from: packetOffsetStart, to: totalSentByteCount };
+			}
+			
+			if(missingPacketSizeCount > 0 ){
+				alert("" + missingPacketSizeCount + " packets didn't have the header.packet_size field set. Defaulting to 1500 bytes, which is probably inaccurate!");
 			}
 
 			// - now we can create two more lists, which will contain a similar setup for ACKed and LOST packets
