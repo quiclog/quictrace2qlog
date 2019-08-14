@@ -133,7 +133,9 @@ function drawGraph(qlog, settings){
 			let packetSentList = [];
 			if (multistreamDictionary.has(getPropertyNameForVersion("TRANSPORT", logSet["qlog_version"])) && multistreamDictionary.get(getPropertyNameForVersion("TRANSPORT", logSet["qlog_version"])).has(getPropertyNameForVersion("PACKET_SENT", logSet["qlog_version"]))) {
 				packetsSent = multistreamDictionary.get(getPropertyNameForVersion("TRANSPORT", logSet["qlog_version"])).get(getPropertyNameForVersion("PACKET_SENT", logSet["qlog_version"]));
-			}
+            }
+            else
+                alert("No PACKET_SENT events found. Make sure the event name is uppercase for qlog draft-00!");
 
 			let missingPacketSizeCount = 0;
 			let totalSentByteCount = 0;
@@ -169,6 +171,8 @@ function drawGraph(qlog, settings){
 			if (multistreamDictionary.has(getPropertyNameForVersion("TRANSPORT", logSet["qlog_version"])) && multistreamDictionary.get(getPropertyNameForVersion("TRANSPORT", logSet["qlog_version"])).has(getPropertyNameForVersion("PACKET_RECEIVED", logSet["qlog_version"]))) {
 				packetsReceived = multistreamDictionary.get(getPropertyNameForVersion("TRANSPORT", logSet["qlog_version"])).get(getPropertyNameForVersion("PACKET_RECEIVED", logSet["qlog_version"]));
 			}
+            else
+                alert("No PACKET_RECEIVED events found. Make sure the event name is uppercase for qlog draft-00!");
 
 			for( let packet of packetsReceived ){
 
@@ -219,6 +223,7 @@ function drawGraph(qlog, settings){
 			if (multistreamDictionary.has(getPropertyNameForVersion("RECOVERY", logSet["qlog_version"])) && multistreamDictionary.get(getPropertyNameForVersion("RECOVERY", logSet["qlog_version"])).has(getPropertyNameForVersion("PACKET_LOST", logSet["qlog_version"]))) {
 				packetsLost = multistreamDictionary.get(getPropertyNameForVersion("RECOVERY", logSet["qlog_version"])).get(getPropertyNameForVersion("PACKET_LOST", logSet["qlog_version"])) || []; // || [] defaults to an empty array if there are no events of that type present in the log
 			}
+
 			for( let packet of packetsLost ){
 
 				let data = packet.details;
@@ -445,7 +450,7 @@ function drawGraph(qlog, settings){
 			let metricUpdates = [];
 			if (multistreamDictionary.has(getPropertyNameForVersion("RECOVERY", logSet["qlog_version"])) && multistreamDictionary.get(getPropertyNameForVersion("RECOVERY", logSet["qlog_version"])).has(getPropertyNameForVersion("METRIC_UPDATE", logSet["qlog_version"]))) {
 				metricUpdates = multistreamDictionary.get(getPropertyNameForVersion("RECOVERY", logSet["qlog_version"])).get(getPropertyNameForVersion("METRIC_UPDATE", logSet["qlog_version"]));
-			};
+			}
 
 			let bytesUpdates = [];
 			let cwndupdates = [];
