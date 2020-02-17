@@ -1,3 +1,7 @@
+# DEPRECATED
+This repository is deprecated. The tooling was moved to and developed further in the qvis project (https://github.com/quiclog/qvis and https://qvis.edm.uhasselt.be/). That new setup does not allow the direct import of the quictrace format anymore though. If you still need that feature, please open an issue in the qvis repository.
+
+
 # quic-trace to qlog
 Tooling to go from the quic-trace format to the qlog format.
 
